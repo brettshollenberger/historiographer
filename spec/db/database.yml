@@ -1,0 +1,11 @@
+default: &default
+  adapter: postgresql
+  prepared_statements: false
+  url: "postgres://localhost/historiographer_development"
+
+development:
+  <<: *default
+
+test:
+  adapter: postgresql
+  database: historiographer_test

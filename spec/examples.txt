@@ -1,0 +1,21 @@
+example_id                              | status | run_time        |
+--------------------------------------- | ------ | --------------- |
+./spec/historiographer_spec.rb[1:1:1]   | passed | 0.00633 seconds |
+./spec/historiographer_spec.rb[1:1:2]   | passed | 0.011 seconds   |
+./spec/historiographer_spec.rb[1:1:3]   | passed | 0.00562 seconds |
+./spec/historiographer_spec.rb[1:2:1]   | passed | 0.01879 seconds |
+./spec/historiographer_spec.rb[1:2:2]   | passed | 0.0013 seconds  |
+./spec/historiographer_spec.rb[1:2:3:1] | passed | 0.00576 seconds |
+./spec/historiographer_spec.rb[1:2:3:2] | passed | 0.02951 seconds |
+./spec/historiographer_spec.rb[1:2:3:3] | passed | 0.00286 seconds |
+./spec/historiographer_spec.rb[1:2:4]   | passed | 0.00299 seconds |
+./spec/historiographer_spec.rb[1:2:5]   | passed | 0.00154 seconds |
+./spec/historiographer_spec.rb[1:2:6]   | passed | 0.00545 seconds |
+./spec/historiographer_spec.rb[1:3:1]   | passed | 0.01922 seconds |
+./spec/historiographer_spec.rb[1:4:1]   | passed | 0.0218 seconds  |
+./spec/historiographer_spec.rb[1:5:1]   | passed | 0.0139 seconds  |
+./spec/historiographer_spec.rb[1:5:2]   | passed | 0.05008 seconds |
+./spec/historiographer_spec.rb[1:6:1]   | passed | 0.01569 seconds |
+./spec/historiographer_spec.rb[1:7:1]   | passed | 0.01945 seconds |
+./spec/historiographer_spec.rb[1:7:2]   | passed | 0.00216 seconds |
+./spec/historiographer_spec.rb[1:8:1]   | passed | 0.01655 seconds |
