@@ -94,7 +94,7 @@ describe Historiographer do
       expect(post_history.body).to eq      post.body
       expect(post_history.author_id).to eq post.author_id
       expect(post_history.post_id).to eq   post.id
-      expect(post_history.history_started_at).to eq @now.in_time_zone(Historiographer::UTC)
+      expect(post_history.history_started_at.to_s).to eq @now.in_time_zone(Historiographer::UTC).to_s
       expect(post_history.history_ended_at).to be_nil
       expect(post_history.history_user_id).to eq user.id
 
@@ -103,7 +103,7 @@ describe Historiographer do
       first_history  = post_histories.first
       second_history = post_histories.second
 
-      expect(first_history.history_ended_at).to eq @now.in_time_zone(Historiographer::UTC)
+      expect(first_history.history_ended_at.to_s).to eq @now.in_time_zone(Historiographer::UTC).to_s
       expect(second_history.history_ended_at).to be_nil
     end
 
@@ -295,7 +295,7 @@ describe Historiographer do
     end
 
     it "finds current even when the db is updated in an invalid way" do
-      sql = <<-SQL
+      postgresql = <<-SQL
         INSERT INTO post_histories (
           title,
           body,
@@ -326,6 +326,46 @@ describe Historiographer do
           NULL
         )
       SQL
+
+      mysql = <<-SQL
+        INSERT INTO post_histories (
+          title,
+          body,
+          post_id,
+          author_id,
+          history_started_at,
+          history_ended_at
+        ) VALUES (
+          'Post 1',
+          'Text',
+          1,
+          1,
+          now() - INTERVAL 1 day,
+          NULL
+        ), (
+          'Post 1',
+          'Different text',
+          1,
+          1,
+          now() - INTERVAL 12 hour,
+          NULL
+        ), (
+          'Post 1',
+          'Even more different text',
+          1,
+          1,
+          now() - INTERVAL 12 hour,
+          NULL
+        )
+      SQL
+
+      sql = nil
+      case PostHistory.connection.instance_variable_get(:@config)[:adapter]
+      when "mysql2"
+        sql = mysql
+      when "postgresql"
+        sql = postgresql
+      end
 
       PostHistory.connection.execute(sql)
 

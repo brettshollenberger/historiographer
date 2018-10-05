@@ -1,4 +1,5 @@
 require "historiographer/postgres_migration"
+require "historiographer/mysql_migration"
 
 class CreateAuthorHistories < ActiveRecord::Migration
   def change

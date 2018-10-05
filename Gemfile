@@ -8,6 +8,7 @@ gem "rollbar"
 group :development, :test do
   gem "pg"
   gem "pry"
+  gem "mysql2", "0.4.10"
   gem "standalone_migrations"
   gem "timecop"
   gem "paranoia", "~> 2.2"

@@ -44,36 +44,17 @@ ActiveRecord::Schema.define(version: 20171011194715) do
 
   add_index "authors", ["deleted_at"], name: "index_authors_on_deleted_at", using: :btree
 
-  create_table "ignorable_histories", force: :cascade do |t|
-    t.integer  "ignorable_id",       null: false
-    t.string   "name"
-    t.string   "ignorable"
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
-    t.integer  "history_user_id"
-  end
-
-  add_index "ignorable_histories", ["history_ended_at"], name: "index_ignorable_histories_on_history_ended_at", using: :btree
-  add_index "ignorable_histories", ["history_started_at"], name: "index_ignorable_histories_on_history_started_at", using: :btree
-  add_index "ignorable_histories", ["history_user_id"], name: "index_ignorable_histories_on_history_user_id", using: :btree
-  add_index "ignorable_histories", ["ignorable_id"], name: "index_ignorable_histories_on_ignorable_id", using: :btree
-
-  create_table "ignorables", force: :cascade do |t|
-    t.string "name"
-    t.string "ignorable"
-  end
-
   create_table "post_histories", force: :cascade do |t|
-    t.integer  "post_id",            null: false
-    t.string   "title",              null: false
-    t.text     "body",               null: false
-    t.integer  "author_id",          null: false
-    t.boolean  "enabled"
+    t.integer  "post_id",                            null: false
+    t.string   "title",                              null: false
+    t.text     "body",                               null: false
+    t.integer  "author_id",                          null: false
+    t.boolean  "enabled",            default: false
     t.datetime "live_at"
     t.datetime "deleted_at"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.datetime "history_started_at", null: false
+    t.datetime "history_started_at",                 null: false
     t.datetime "history_ended_at"
     t.integer  "history_user_id"
   end
@@ -104,16 +85,16 @@ ActiveRecord::Schema.define(version: 20171011194715) do
   add_index "posts", ["live_at"], name: "index_posts_on_live_at", using: :btree
 
   create_table "safe_post_histories", force: :cascade do |t|
-    t.integer  "safe_post_id",       null: false
-    t.string   "title",              null: false
-    t.text     "body",               null: false
-    t.integer  "author_id",          null: false
-    t.boolean  "enabled"
+    t.integer  "safe_post_id",                       null: false
+    t.string   "title",                              null: false
+    t.text     "body",                               null: false
+    t.integer  "author_id",                          null: false
+    t.boolean  "enabled",            default: false
     t.datetime "live_at"
     t.datetime "deleted_at"
     t.datetime "created_at"
     t.datetime "updated_at"
-    t.datetime "history_started_at", null: false
+    t.datetime "history_started_at",                 null: false
     t.datetime "history_ended_at"
     t.integer  "history_user_id"
   end

@@ -9,3 +9,19 @@ development:
 test:
   adapter: postgresql
   database: historiographer_test
+
+mysql_default: &mysql_default
+  adapter: mysql2
+  encoding: utf8
+  username: root
+  password:
+  host: 127.0.0.1
+  port: 3306
+
+mysql_development:
+  <<: *mysql_default
+  database: historiographer_development
+
+mysql_test:
+  <<: *mysql_default
+  database: historiographer_test
