@@ -11,9 +11,9 @@ rescue Bundler::BundlerError => e
   exit e.status_code
 end
 require 'rake'
+require 'jeweler'
 
-require 'juwelier'
-Juwelier::Tasks.new do |gem|
+Jeweler::Tasks.new do |gem|
   # gem is a Gem::Specification... see http://guides.rubygems.org/specification-reference/ for more options
   gem.name = "historiographer"
   gem.homepage = "http://github.com/brettshollenberger/historiographer"
@@ -23,7 +23,7 @@ Juwelier::Tasks.new do |gem|
   gem.email = "brett.shollenberger@gmail.com"
   gem.authors = ["brettshollenberger"]
 end
-Juwelier::RubygemsDotOrgTasks.new
+Jeweler::RubygemsDotOrgTasks.new
 
 require 'rake/testtask'
 Rake::TestTask.new(:test) do |test|
