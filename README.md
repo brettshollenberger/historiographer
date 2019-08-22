@@ -6,7 +6,7 @@ Supported for PostgreSQL and MySQL. If you need other adapters, help us make one
 
 ## Existing auditing gems for Rails suck
 
-The Audited gem has some serious flaws. 
+The Audited gem has some serious flaws.
 
 First, it only tracks a record of what changed, so there's no way to "go back in time" and see what the data looked like back when a problem occurred without replaying every single audit.
 
@@ -24,7 +24,7 @@ Moreover, there are benefits to the Active Record model of updating records in p
 
 So how can we get the benefits of caching but NOT losing data, and continue to create, update, and destroy like we normally would in Rails?
 
-Historiographer introduces the concept of *history tables:* tables that have the exact same structure as tables storing the latest snapshots of data. So if you have a `posts` table, you'll also have a `post_histories` table with all the same columns and indexes.
+Historiographer introduces the concept of _history tables:_ tables that have the exact same structure as tables storing the latest snapshots of data. So if you have a `posts` table, you'll also have a `post_histories` table with all the same columns and indexes.
 
 Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would. If the changes are successful, it also inserts a new history snapshot in the histories table--an exact snapshot of the data at that point in time.
 
@@ -52,7 +52,7 @@ class CreatePosts < ActiveRecord::Migration
 end
 ```
 
-You should create a model named *posts_histories*:
+You should create a model named _posts_histories_:
 
 ```ruby
 require "historiographer/postgres_migration"
@@ -67,18 +67,18 @@ end
 
 The `t.histories` method will automatically create a table with the following columns:
 
-* `id` (because every model has a primary key)
-* `post\_id` (because this is the foreign key)
-* `title` (because it was on the original model)
-* `enabled` (because it was on the original model)
-* `history\_started\_at` (to denote when this history became the canonical version)
-* `history\_ended\_at` (to denote when this history was no longer the canonical version, if it has stopped being the canonical version)
-* `history\_user\_id` (to denote the user that made this change, if one is known)
+- `id` (because every model has a primary key)
+- `post_id` (because this is the foreign key)
+- `title` (because it was on the original model)
+- `enabled` (because it was on the original model)
+- `history_started_at` (to denote when this history became the canonical version)
+- `history_ended_at` (to denote when this history was no longer the canonical version, if it has stopped being the canonical version)
+- `history_user_id` (to denote the user that made this change, if one is known)
 
 Additionally it will add indices on:
 
-* The same columns that had indices on the original model (e.g. `enabled`)
-* `history\_started\_at`, `history\_ended\_at`, and `history\_user\_id`
+- The same columns that had indices on the original model (e.g. `enabled`)
+- `history_started_at`, `history_ended_at`, and `history_user_id`
 
 ## models
 
