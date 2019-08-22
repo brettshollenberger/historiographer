@@ -1,4 +1,4 @@
-class CreateSafePosts < ActiveRecord::Migration
+class CreateSafePosts < ActiveRecord::Migration[5.1]
   def change
     create_table :safe_posts do |t|
       t.string :title, null: false

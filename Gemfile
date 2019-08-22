@@ -1,7 +1,7 @@
 source "https://rubygems.org"
-ruby "2.3.6"
+ruby "2.6.3"
 
-gem "activerecord", "~> 4.0"
+gem "activerecord", "~> 5.1"
 gem "activesupport"
 gem "rollbar"
 
@@ -11,7 +11,7 @@ group :development, :test do
   gem "mysql2", "0.4.10"
   gem "standalone_migrations"
   gem "timecop"
-  gem "paranoia", "~> 2.2"
+  gem "paranoia"
 end
 
 group :development do

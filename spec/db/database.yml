@@ -1,14 +1,14 @@
-default: &default
-  adapter: postgresql
-  prepared_statements: false
-  url: "postgres://localhost/historiographer_development"
+# default: &default
+#   adapter: postgresql
+#   prepared_statements: false
+#   url: "postgres://localhost/historiographer_development"
 
-development:
-  <<: *default
+# development:
+#   <<: *default
 
-test:
-  adapter: postgresql
-  database: historiographer_test
+# test:
+#   adapter: postgresql
+#   database: historiographer_test
 
 mysql_default: &mysql_default
   adapter: mysql2
@@ -18,10 +18,10 @@ mysql_default: &mysql_default
   host: 127.0.0.1
   port: 3306
 
-mysql_development:
+development:
   <<: *mysql_default
   database: historiographer_development
 
-mysql_test:
+test:
   <<: *mysql_default
   database: historiographer_test

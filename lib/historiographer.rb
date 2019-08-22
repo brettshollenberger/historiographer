@@ -112,13 +112,21 @@ module Historiographer
       super
     end
 
+    def historiographer_changes?
+      case Rails.version.to_f
+      when 0..5 then changed? && valid?
+      when 5.1..6 then saved_changes?
+      else
+        raise "Unsupported Rails version"
+      end
+    end
     #
     # If there are any changes, and the model is valid,
     # and we're not force-overriding history recording,
     # then record history after successful save.
     #
     def should_record_history?
-      changes.keys.any? && valid? && !@no_history
+      historiographer_changes? && !@no_history
     end
 
     attr_accessor :history_user_id
