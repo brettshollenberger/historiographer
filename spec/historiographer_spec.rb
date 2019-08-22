@@ -199,6 +199,7 @@ describe Historiographer do
       end
 
       expect { create_post }.to raise_error
+      expect(Post.count).to be 0
       expect(PostHistory.count).to be 0
 
       Post.skip_callback(:save, :after, :raise_error)
@@ -333,6 +334,8 @@ describe Historiographer do
           body,
           post_id,
           author_id,
+          created_at,
+          updated_at,
           history_started_at,
           history_ended_at
         ) VALUES (
@@ -340,6 +343,8 @@ describe Historiographer do
           'Text',
           1,
           1,
+          now(),
+          now(),
           now() - INTERVAL 1 day,
           NULL
         ), (
@@ -347,6 +352,8 @@ describe Historiographer do
           'Different text',
           1,
           1,
+          now(),
+          now(),
           now() - INTERVAL 12 hour,
           NULL
         ), (
@@ -354,6 +361,8 @@ describe Historiographer do
           'Even more different text',
           1,
           1,
+          now(),
+          now(),
           now() - INTERVAL 12 hour,
           NULL
         )

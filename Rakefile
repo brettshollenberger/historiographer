@@ -16,7 +16,7 @@ require 'juwelier'
 Juwelier::Tasks.new do |gem|
   # gem is a Gem::Specification... see http://guides.rubygems.org/specification-reference/ for more options
   gem.name = "historiographer"
-  gem.homepage = "http://github.com/instacart/historiographer"
+  gem.homepage = "http://github.com/brettshollenberger/historiographer"
   gem.license = "MIT"
   gem.summary = %Q{Create histories of your ActiveRecord tables}
   gem.description = %Q{Creates separate tables for each history table}

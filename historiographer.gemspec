@@ -14,7 +14,7 @@ Gem::Specification.new do |s|
   s.date = "2016-11-28"
   s.description = "Creates separate tables for each history table"
   s.email = "brett.shollenberger@gmail.com"
-  s.homepage = "http://github.com/instacart/historiographer"
+  s.homepage = "http://github.com/brettshollenberger/historiographer"
   s.licenses = ["MIT"]
   s.rubygems_version = "2.5.1"
   s.summary = "Create histories of your ActiveRecord tables"
