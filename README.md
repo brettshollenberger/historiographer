@@ -93,7 +93,7 @@ end
 You should also make a `PostHistory` class if you're going to query `PostHistory` from Rails:
 
 ```ruby
-class PostHistory
+class PostHistory < ActiveRecord::Base
 end
 ```
 
