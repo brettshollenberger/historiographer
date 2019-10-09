@@ -85,7 +85,7 @@ Additionally it will add indices on:
 The primary model should include `Historiographer`:
 
 ```ruby
-class Post
+class Post < ActiveRecord::Base
   include Historiographer
 end
 ```
