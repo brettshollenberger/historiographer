@@ -61,7 +61,6 @@ module Historiographer
     extend ActiveSupport::Concern
 
     included do |base|
-
       #
       # A History class (e.g. RetailerProductHistory) will gain
       # access to a current scope, returning
@@ -93,7 +92,7 @@ module Historiographer
       # "RetailerProductHistory."
       #
       foreign_class_name = base.name.gsub(/History$/) {}        # e.g. "RetailerProductHistory" => "RetailerProduct"
-      association_name   = foreign_class_name.underscore.to_sym # e.g. "RetailerProduct"        => :retailer_product
+      association_name   = foreign_class_name.split("::").last.underscore.to_sym # e.g. "RetailerProduct" => :retailer_product
 
       #
       # Historiographer will automatically setup the association

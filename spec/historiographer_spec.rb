@@ -266,15 +266,30 @@ describe Historiographer do
   end
   
   describe "Deletion" do
-    it "records deleted_at on primary and history if you use acts_as_paranoid" do
+    it "records deleted_at and history_user_id on primary and history if you use acts_as_paranoid" do
+      post = create_post
+
+      expect {
+        post.destroy(history_user_id: 2)
+      }.to_not change {
+        PostHistory.count
+      }
+
+      expect(PostHistory.last.history_ended_at).to_not be_nil
+      expect(PostHistory.last.deleted_at).to be_nil
       class Post
         acts_as_paranoid
       end
 
-      post = create_post
+      post = Post.create(
+        title: "Post 1",
+        body: "Great post",
+        author_id: 1,
+        history_user_id: user.id
+      )
 
       expect {
-        post.destroy
+        post.destroy(history_user_id: 2)
       }.to change {
         PostHistory.count
       }.by 1
@@ -282,7 +297,7 @@ describe Historiographer do
       expect(Post.unscoped.where.not(deleted_at: nil).count).to eq 1
       expect(Post.unscoped.where(deleted_at: nil).count).to eq 0
       expect(PostHistory.where.not(deleted_at: nil).count).to eq 1
-      expect(PostHistory.where(deleted_at: nil).count).to eq 1
+      expect(PostHistory.last.history_user_id).to eq 2
     end
   end
 

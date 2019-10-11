@@ -89,6 +89,22 @@ module Historiographer
       end
     end
 
+    alias_method :destroy_without_history, :destroy
+    def destroy_with_history(history_user_id: )
+      current_history = histories.where(history_ended_at: nil).order("id desc").limit(1).last
+      current_history.update!(history_ended_at: UTC.now) if current_history.present?
+
+      if respond_to?(:paranoia_destroy)
+        self.history_user_id = history_user_id
+        paranoia_destroy
+      else
+        @no_history = true
+        destroy_without_history
+        @no_history = false
+      end
+    end
+    alias_method :destroy, :destroy_with_history
+
     def assign_attributes(new_attributes)
       huid = new_attributes[:history_user_id]
 
@@ -133,13 +149,6 @@ module Historiographer
 
     class_name = "#{base.name}History"
 
-    if base.respond_to?(:histories)
-      raise "#{base} already has histories. Talk to Brett if this is a legit use case."
-    else
-      has_many :histories, class_name: class_name
-      has_one :current_history, -> { current }, class_name: class_name
-    end
-
     begin
       class_name.constantize
     rescue
@@ -150,6 +159,15 @@ module Historiographer
     end
 
     klass = class_name.constantize
+
+    if base.respond_to?(:histories)
+      raise "#{base} already has histories. Talk to Brett if this is a legit use case."
+    else
+      opts = { class_name: class_name }
+      opts.merge!(foreign_key: klass.history_foreign_key) if klass.respond_to?(:history_foreign_key)
+      has_many :histories, opts
+      has_one :current_history, -> { current }, opts
+    end
 
     klass.send(:include, Historiographer::History) unless klass.ancestors.include?(Historiographer::History)
 
