@@ -80,6 +80,24 @@ Additionally it will add indices on:
 - The same columns that had indices on the original model (e.g. `enabled`)
 - `history_started_at`, `history_ended_at`, and `history_user_id`
 
+### what to do when generated index names are too long
+
+Sometimes the generated index names are too long. Just like with standard Rails migrations, you can override the name of the index to fix this problem. To do so, use the `index_names` argument to override individual index names:
+
+```ruby
+require "historiographer/postgres_migration"
+class CreatePostHistories < ActiveRecord::Migration
+  def change
+    create_table :post_histories do |t|
+      t.histories, index_names: {
+        title: "my_index_name",
+        [:compound, :index] => "my_compound_index_name"
+      }
+    end
+  end
+end
+```
+
 ## models
 
 The primary model should include `Historiographer`:
