@@ -1,27 +1,26 @@
-# default: &default
-#   adapter: postgresql
-#   prepared_statements: false
-#   url: "postgres://localhost/historiographer_development"
-
-# development:
-#   <<: *default
-
-# test:
-#   adapter: postgresql
-#   database: historiographer_test
-
-mysql_default: &mysql_default
-  adapter: mysql2
-  encoding: utf8
-  username: root
-  password:
-  host: 127.0.0.1
-  port: 3306
+default: &default
+  adapter: postgresql
+  prepared_statements: false
+  url: "postgres://localhost/historiographer_development"
 
 development:
-  <<: *mysql_default
-  database: historiographer_development
+  <<: *default
 
 test:
-  <<: *mysql_default
+  adapter: postgresql
   database: historiographer_test
+# mysql_default: &mysql_default
+#   adapter: mysql2
+#   encoding: utf8
+#   username: root
+#   password:
+#   host: 127.0.0.1
+#   port: 3306
+
+# development:
+#   <<: *mysql_default
+#   database: historiographer_development
+
+# test:
+#   <<: *mysql_default
+#   database: historiographer_test

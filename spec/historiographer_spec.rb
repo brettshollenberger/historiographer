@@ -24,6 +24,13 @@ end
 class User < ActiveRecord::Base
 end
 
+class ThingWithCompoundIndex < ActiveRecord::Base
+  include Historiographer
+end
+
+class ThingWithCompoundIndexHistory < ActiveRecord::Base
+end
+
 describe Historiographer do
   before(:all) do
     @now = Timecop.freeze
@@ -317,6 +324,8 @@ describe Historiographer do
           body,
           post_id,
           author_id,
+          created_at,
+          updated_at,
           history_started_at,
           history_ended_at
         ) VALUES (
@@ -324,6 +333,8 @@ describe Historiographer do
           'Text',
           1,
           1,
+          now(),
+          now(),
           now() - INTERVAL '1 day',
           NULL
         ), (
@@ -331,6 +342,8 @@ describe Historiographer do
           'Different text',
           1,
           1,
+          now(),
+          now(),
           now() - INTERVAL '12 hours',
           NULL
         ), (
@@ -338,6 +351,8 @@ describe Historiographer do
           'Even more different text',
           1,
           1,
+          now(),
+          now(),
           now() - INTERVAL '12 hours',
           NULL
         )
@@ -405,6 +420,44 @@ describe Historiographer do
 
       expect(post.current_history.user.name).to eq username
       expect(author.current_history.user.name).to eq username
+    end
+  end
+
+  describe "Migrations with compound indexes" do
+    it "supports renaming compound indexes and migrating them to history tables" do
+      indices_sql = %q(
+        SELECT 
+          DISTINCT(
+            ARRAY_TO_STRING(ARRAY(
+             SELECT pg_get_indexdef(idx.indexrelid, k + 1, true)
+             FROM generate_subscripts(idx.indkey, 1) as k
+             ORDER BY k
+           ), ',')
+         ) as indkey_names
+        FROM pg_class t,
+        pg_class i,
+        pg_index idx,
+        pg_attribute a,
+        pg_am am
+        WHERE t.oid = idx.indrelid
+        AND i.oid = idx.indexrelid
+        AND a.attrelid = t.oid
+        AND a.attnum = ANY(idx.indkey)
+        AND t.relkind = 'r'
+        AND t.relname = ?;
+      )
+
+      indices_query_array = [indices_sql, :thing_with_compound_index_histories]
+      indices_sanitized_query = ThingWithCompoundIndexHistory.send(:sanitize_sql_array, indices_query_array)
+
+      indexes = ThingWithCompoundIndexHistory.connection.execute(indices_sanitized_query).to_a.map(&:values).flatten.map { |i| i.split(",") }
+
+      expect(indexes).to include(["history_started_at"])
+      expect(indexes).to include(["history_ended_at"])
+      expect(indexes).to include(["history_user_id"])
+      expect(indexes).to include(["id"])
+      expect(indexes).to include(["key", "value"])
+      expect(indexes).to include(["thing_with_compound_index_id"])
     end
   end
 end

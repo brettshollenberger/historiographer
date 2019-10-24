@@ -16,7 +16,8 @@ module Historiographer
     # Will automatically add user_id, history_started_at,
     # and history_ended_at columns
     #
-    def histories(except: [], only: [], no_business_columns: false)
+    def histories(except: [], only: [], no_business_columns: false, index_names: {})
+      index_names.symbolize_keys!
       original_table_name = self.name.gsub(/_histories$/) {}.pluralize
       foreign_key         = original_table_name.singularize.foreign_key
 
@@ -32,7 +33,6 @@ module Historiographer
       original_columns.each do |column|
         opts = {}
         opts.merge!(column.as_json.clone)
-        # opts.merge!(column.type.as_json.clone)
 
         send(column.type, column.name, opts.symbolize_keys!)
       end
@@ -41,36 +41,47 @@ module Historiographer
       datetime :history_ended_at
       integer :history_user_id
 
-      index :history_started_at
-      index :history_ended_at
-      index :history_user_id
-      index foreign_key
-
-      indices_sql = <<-SQL
-        SELECT
-            a.attname AS column_name
-        FROM
-            pg_class t,
-            pg_class i,
-            pg_index ix,
-            pg_attribute a
-        WHERE
-            t.oid = ix.indrelid
-            AND i.oid = ix.indexrelid
-            AND a.attrelid = t.oid
-            AND a.attnum = ANY(ix.indkey)
-            AND t.relkind = 'r'
-            AND t.relname = ?
-        ORDER BY
-            t.relname,
-            i.relname;
-      SQL
+      indices_sql = %q(
+        SELECT 
+          DISTINCT(
+            ARRAY_TO_STRING(ARRAY(
+             SELECT pg_get_indexdef(idx.indexrelid, k + 1, true)
+             FROM generate_subscripts(idx.indkey, 1) as k
+             ORDER BY k
+           ), ',')
+         ) as indkey_names
+        FROM pg_class t,
+        pg_class i,
+        pg_index idx,
+        pg_attribute a,
+        pg_am am
+        WHERE t.oid = idx.indrelid
+        AND i.oid = idx.indexrelid
+        AND a.attrelid = t.oid
+        AND a.attnum = ANY(idx.indkey)
+        AND t.relkind = 'r'
+        AND t.relname = ?;
+      )
 
       indices_query_array = [indices_sql, original_table_name]
       indices_sanitized_query = klass.send(:sanitize_sql_array, indices_query_array)
 
-      klass.connection.execute(indices_sanitized_query).to_a.map(&:values).flatten.reject { |i| i == "id" }.each do |index_name|
-        index index_name.to_sym
+      indexes = klass.connection.execute(indices_sanitized_query).to_a.map(&:values).flatten.reject { |i| i == "id" }.map { |i| i.split(",") }.concat([
+        foreign_key,
+        :history_started_at,
+        :history_ended_at,
+        :history_user_id
+      ])
+
+      indexes.each do |index_definition|
+        index_definition = [index_definition].flatten.map(&:to_sym)
+        index_name = index_definition.count == 1 ?  index_definition.first : index_definition
+
+        if index_names.key?(index_name)
+          index index_name, name: index_names[index_name]
+        else
+          index index_name
+        end
       end
 
     end

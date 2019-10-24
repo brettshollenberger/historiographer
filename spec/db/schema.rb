@@ -10,9 +10,12 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2017_10_11_194715) do
+ActiveRecord::Schema.define(version: 2019_10_24_142352) do
 
-  create_table "author_histories", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  # These are extensions that must be enabled in order to support this database
+  enable_extension "plpgsql"
+
+  create_table "author_histories", force: :cascade do |t|
     t.integer "author_id", null: false
     t.string "full_name", null: false
     t.text "bio"
@@ -29,7 +32,7 @@ ActiveRecord::Schema.define(version: 2017_10_11_194715) do
     t.index ["history_user_id"], name: "index_author_histories_on_history_user_id"
   end
 
-  create_table "authors", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  create_table "authors", force: :cascade do |t|
     t.string "full_name", null: false
     t.text "bio"
     t.datetime "deleted_at"
@@ -38,7 +41,7 @@ ActiveRecord::Schema.define(version: 2017_10_11_194715) do
     t.index ["deleted_at"], name: "index_authors_on_deleted_at"
   end
 
-  create_table "post_histories", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  create_table "post_histories", force: :cascade do |t|
     t.integer "post_id", null: false
     t.string "title", null: false
     t.text "body", null: false
@@ -61,7 +64,7 @@ ActiveRecord::Schema.define(version: 2017_10_11_194715) do
     t.index ["post_id"], name: "index_post_histories_on_post_id"
   end
 
-  create_table "posts", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  create_table "posts", force: :cascade do |t|
     t.string "title", null: false
     t.text "body", null: false
     t.integer "author_id", null: false
@@ -76,7 +79,7 @@ ActiveRecord::Schema.define(version: 2017_10_11_194715) do
     t.index ["live_at"], name: "index_posts_on_live_at"
   end
 
-  create_table "safe_post_histories", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  create_table "safe_post_histories", force: :cascade do |t|
     t.integer "safe_post_id", null: false
     t.string "title", null: false
     t.text "body", null: false
@@ -99,7 +102,7 @@ ActiveRecord::Schema.define(version: 2017_10_11_194715) do
     t.index ["safe_post_id"], name: "index_safe_post_histories_on_safe_post_id"
   end
 
-  create_table "safe_posts", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  create_table "safe_posts", force: :cascade do |t|
     t.string "title", null: false
     t.text "body", null: false
     t.integer "author_id", null: false
@@ -114,7 +117,27 @@ ActiveRecord::Schema.define(version: 2017_10_11_194715) do
     t.index ["live_at"], name: "index_safe_posts_on_live_at"
   end
 
-  create_table "users", options: "ENGINE=InnoDB DEFAULT CHARSET=utf8", force: :cascade do |t|
+  create_table "thing_with_compound_index_histories", force: :cascade do |t|
+    t.integer "thing_with_compound_index_id", null: false
+    t.string "key"
+    t.string "value"
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.index ["history_ended_at"], name: "index_thing_with_compound_index_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_thing_with_compound_index_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_thing_with_compound_index_histories_on_history_user_id"
+    t.index ["key", "value"], name: "idx_history_k_v"
+    t.index ["thing_with_compound_index_id"], name: "idx_k_v_histories"
+  end
+
+  create_table "thing_with_compound_indices", force: :cascade do |t|
+    t.string "key"
+    t.string "value"
+    t.index ["key", "value"], name: "idx_key_value"
+  end
+
+  create_table "users", force: :cascade do |t|
     t.string "name"
   end
 
