@@ -44,7 +44,7 @@ You'll also have a `post_histories_table`:
 
 If you change the title of the 1st post:
 
-```Post.find(1).update(title: "Title With Better SEO")```
+```Post.find(1).update(title: "Title With Better SEO", history_user_id: current_user.id)```
 
 You'll expect your `posts` table to be updated directly:
 
@@ -65,11 +65,33 @@ A few things have happened here:
 
 1. The primary table (`posts`) is updated directly
 2. The existing history for `post_id=1` is timestamped when its `history_ended_at`, so that we can see when the post had the title "My Great Post"
-3. A new history record is appended to the table containing a complete snapshot of the record, and a `NULL` `history_ended_at`. That's because this is the current history. You can always find the current snapshots of records either by querying the primary table (`posts`), or querying the `histories` table using `history_ended_at IS NULL`.
+3. A new history record is appended to the table containing a complete snapshot of the record, and a `NULL` `history_ended_at`. That's because this is the current history. 
+4. A record of _who_ made the change is saved (`history_user_id`). You can join to your users table to see more data.
 
 # Getting Started
 
-Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would. 
+Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would.
+
+```ruby
+class Post < ActiveRecord::Base
+  include Historiographer
+end
+```
+
+By default, Historiographer will require all SQL-backed methods to provide a `history_user_id` to track who made the changes.
+
+```ruby
+Post.create(title: "My Post", history_user_id: current_user.id) # => OK
+Post.create(title: "My Post") # => Error!
+```
+
+Many existing models will be better off using `Historiographer::Safe` when getting started, which will not raise an error, but will alert you of locations where your app is missing `history_user_id`. 
+
+```ruby
+class Post < ActiveRecord::Base
+  include Historiographer::Safe
+end
+```
 
 ## Create A Migration
 
@@ -117,24 +139,6 @@ Additionally it will add indices on:
 - The same columns that had indices on the original model (e.g. `enabled`)
 - `history_started_at`, `history_ended_at`, and `history_user_id`
 
-### What to do when generated index names are too long
-
-Sometimes the generated index names are too long. Just like with standard Rails migrations, you can override the name of the index to fix this problem. To do so, use the `index_names` argument to override individual index names:
-
-```ruby
-require "historiographer/postgres_migration"
-class CreatePostHistories < ActiveRecord::Migration
-  def change
-    create_table :post_histories do |t|
-      t.histories, index_names: {
-        title: "my_index_name",
-        [:compound, :index] => "my_compound_index_name"
-      }
-    end
-  end
-end
-```
-
 ## Models
 
 The primary model should include `Historiographer`:
@@ -169,11 +173,11 @@ p.histories.first.post == p
 You can just use normal ActiveRecord methods, and all will record histories:
 
 ```ruby
-Post.create(title: "My Great Title")
-Post.find_by(title: "My Great Title").update(title: "A New Title")
-Post.update_all(title: "They're all the same!")
-Post.last.destroy!
-Post.destroy_all
+Post.create(title: "My Great Title", history_user_id: current_user.id)
+Post.find_by(title: "My Great Title").update(title: "A New Title", history_user_id: current_user.id)
+Post.update_all(title: "They're all the same!", history_user_id: current_user.id)
+Post.last.destroy!(history_user_id: current_user.id)
+Post.destroy_all(history_user_id: current_user.id)
 ```
 
 The `histories` classes have a `current` method, which only finds current history records. These records will also be the same as the data in the primary table.
@@ -183,6 +187,24 @@ p = Post.first
 p.current_history
 
 PostHistory.current
+```
+
+### What to do when generated index names are too long
+
+Sometimes the generated index names are too long. Just like with standard Rails migrations, you can override the name of the index to fix this problem. To do so, use the `index_names` argument to override individual index names:
+
+```ruby
+require "historiographer/postgres_migration"
+class CreatePostHistories < ActiveRecord::Migration
+  def change
+    create_table :post_histories do |t|
+      t.histories, index_names: {
+        title: "my_index_name",
+        [:compound, :index] => "my_compound_index_name"
+      }
+    end
+  end
+end
 ```
 
 == Copyright
