@@ -209,5 +209,5 @@ end
 
 == Copyright
 
-Copyright (c) 2016-2018 brettshollenberger. See LICENSE.txt for
+Copyright (c) 2016-2020 brettshollenberger. See LICENSE.txt for
 further details.
