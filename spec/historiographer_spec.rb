@@ -2,6 +2,7 @@ require "spec_helper"
 
 class Post < ActiveRecord::Base
   include Historiographer
+  acts_as_paranoid
 end
 
 class PostHistory < ActiveRecord::Base
@@ -29,6 +30,9 @@ class ThingWithCompoundIndex < ActiveRecord::Base
 end
 
 class ThingWithCompoundIndexHistory < ActiveRecord::Base
+end
+
+class ThingWithoutHistory < ActiveRecord::Base
 end
 
 describe Historiographer do
@@ -127,6 +131,138 @@ describe Historiographer do
       }.to raise_error(
         Historiographer::HistoryUserIdMissingError
       )
+    end
+
+    context "When directly hitting the database via SQL" do
+      context "#update_all" do
+        it "still updates histories" do
+          FactoryBot.create_list(:post, 3, history_user_id: 1)
+
+          posts = Post.all
+          expect(posts.count).to eq 3
+          expect(PostHistory.count).to eq 3
+          expect(posts.map(&:histories).map(&:count)).to all (eq 1)
+
+          posts.update_all(title: "My New Post Title", history_user_id: 1)
+
+          expect(PostHistory.count).to eq 6
+          expect(PostHistory.current.count).to eq 3
+          expect(posts.map(&:histories).map(&:count)).to all(eq 2)
+          expect(posts.map(&:current_history).map(&:title)).to all (eq "My New Post Title")
+          expect(Post.all).to respond_to :has_histories?
+
+          # It can update by sub-query
+          Post.where(id: [posts.first.id, posts.last.id]).update_all(title: "Brett's Post", history_user_id: 1)
+          posts = Post.all.reload.order(:id)
+          expect(posts.first.histories.count).to eq 3
+          expect(posts.second.histories.count).to eq 2
+          expect(posts.third.histories.count).to eq 3
+          expect(posts.first.title).to eq "Brett's Post"
+          expect(posts.second.title).to eq "My New Post Title"
+          expect(posts.third.title).to eq "Brett's Post"
+          expect(posts.first.current_history.title).to eq "Brett's Post"
+          expect(posts.second.current_history.title).to eq "My New Post Title"
+          expect(posts.third.current_history.title).to eq "Brett's Post"
+
+          posts.update_all_without_history(title: "Untracked")
+          expect(posts.first.histories.count).to eq 3
+          expect(posts.second.histories.count).to eq 2
+          expect(posts.third.histories.count).to eq 3
+
+          thing1 = ThingWithoutHistory.create(name: "Thing 1")
+          thing2 = ThingWithoutHistory.create(name: "Thing 2")
+
+          ThingWithoutHistory.all.update_all(name: "Thing 3")
+
+          expect(ThingWithoutHistory.all.map(&:name)).to all(eq "Thing 3")
+          expect(ThingWithoutHistory.all).to_not respond_to :has_histories?
+        end
+        
+        it "respects safety" do
+          FactoryBot.create_list(:post, 3, history_user_id: 1)
+
+          posts = Post.all
+          expect(posts.count).to eq 3
+          expect(PostHistory.count).to eq 3
+          expect(posts.map(&:histories).map(&:count)).to all (eq 1)
+
+          expect {
+            posts.update_all(title: "My New Post Title")
+          }.to raise_error
+
+          posts.reload.map(&:title).each do |title|
+            expect(title).to_not eq "My New Post Title"
+          end
+
+          SafePost.create(
+            title: "Post 1",
+            body: "Great post",
+            author_id: 1,
+          )
+
+          safe_posts = SafePost.all
+
+          expect {
+            safe_posts.update_all(title: "New One")
+          }.to_not raise_error
+
+          expect(safe_posts.map(&:title)).to all(eq "New One")
+        end
+      end
+
+      context "#delete_all" do
+        it "includes histories when not paranoid" do
+          Timecop.freeze
+          authors = 3.times.map do
+            Author.create(full_name: "Brett", history_user_id: 1)
+          end
+          Author.delete_all(history_user_id: 1)
+          expect(AuthorHistory.count).to eq 3
+          expect(AuthorHistory.current.count).to eq 0
+          expect(AuthorHistory.where.not(history_ended_at: nil).count).to eq 3
+          expect(Author.count).to eq 0
+          Timecop.return
+        end
+
+        it "includes histories when paranoid" do
+          Timecop.freeze
+          posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
+          Post.delete_all(history_user_id: 1)
+          expect(PostHistory.count).to eq 6
+          expect(PostHistory.current.count).to eq 3
+          expect(PostHistory.current.map(&:deleted_at)).to all(eq Time.now)
+          expect(PostHistory.current.map(&:history_user_id)).to all(eq 1)
+          expect(PostHistory.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
+          expect(PostHistory.where(history_ended_at: nil).count).to eq 3
+          expect(Post.count).to eq 0
+          Timecop.return
+        end
+
+        it "allows delete_all_without_history" do
+          authors = 3.times.map do
+            Author.create(full_name: "Brett", history_user_id: 1)
+          end
+          Author.all.delete_all_without_history
+          expect(AuthorHistory.current.count).to eq 3
+          expect(Author.count).to eq 0
+        end
+      end
+
+      context "#destroy_all" do
+        it "includes histories" do
+          Timecop.freeze
+          posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
+          Post.destroy_all(history_user_id: 1)
+          expect(PostHistory.count).to eq 6
+          expect(PostHistory.current.count).to eq 3
+          expect(PostHistory.current.map(&:deleted_at)).to all(eq Time.now)
+          expect(PostHistory.current.map(&:history_user_id)).to all(eq 1)
+          expect(PostHistory.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
+          expect(PostHistory.where(history_ended_at: nil).count).to eq 3
+          expect(Post.count).to eq 0
+          Timecop.return
+        end
+      end
     end
 
     context "When Safe mode" do
@@ -274,20 +410,6 @@ describe Historiographer do
   
   describe "Deletion" do
     it "records deleted_at and history_user_id on primary and history if you use acts_as_paranoid" do
-      post = create_post
-
-      expect {
-        post.destroy(history_user_id: 2)
-      }.to_not change {
-        PostHistory.count
-      }
-
-      expect(PostHistory.last.history_ended_at).to_not be_nil
-      expect(PostHistory.last.deleted_at).to be_nil
-      class Post
-        acts_as_paranoid
-      end
-
       post = Post.create(
         title: "Post 1",
         body: "Great post",
@@ -315,101 +437,6 @@ describe Historiographer do
       post.update(title: "New Title 2")
 
       expect(PostHistory.current.count).to be 1
-    end
-
-    it "finds current even when the db is updated in an invalid way" do
-      postgresql = <<-SQL
-        INSERT INTO post_histories (
-          title,
-          body,
-          post_id,
-          author_id,
-          created_at,
-          updated_at,
-          history_started_at,
-          history_ended_at
-        ) VALUES (
-          'Post 1',
-          'Text',
-          1,
-          1,
-          now(),
-          now(),
-          now() - INTERVAL '1 day',
-          NULL
-        ), (
-          'Post 1',
-          'Different text',
-          1,
-          1,
-          now(),
-          now(),
-          now() - INTERVAL '12 hours',
-          NULL
-        ), (
-          'Post 1',
-          'Even more different text',
-          1,
-          1,
-          now(),
-          now(),
-          now() - INTERVAL '12 hours',
-          NULL
-        )
-      SQL
-
-      mysql = <<-SQL
-        INSERT INTO post_histories (
-          title,
-          body,
-          post_id,
-          author_id,
-          created_at,
-          updated_at,
-          history_started_at,
-          history_ended_at
-        ) VALUES (
-          'Post 1',
-          'Text',
-          1,
-          1,
-          now(),
-          now(),
-          now() - INTERVAL 1 day,
-          NULL
-        ), (
-          'Post 1',
-          'Different text',
-          1,
-          1,
-          now(),
-          now(),
-          now() - INTERVAL 12 hour,
-          NULL
-        ), (
-          'Post 1',
-          'Even more different text',
-          1,
-          1,
-          now(),
-          now(),
-          now() - INTERVAL 12 hour,
-          NULL
-        )
-      SQL
-
-      sql = nil
-      case PostHistory.connection.instance_variable_get(:@config)[:adapter]
-      when "mysql2"
-        sql = mysql
-      when "postgresql"
-        sql = postgresql
-      end
-
-      PostHistory.connection.execute(sql)
-
-      expect(PostHistory.current.count).to be 1
-      expect(PostHistory.current.first.body).to eq "Even more different text"
     end
   end
 

@@ -66,11 +66,7 @@ module Historiographer
       # access to a current scope, returning
       # the most recent history.
       #
-      # Although we never want there to be more than 1 current history,
-      # in the off chance this invariant is broken, this method is
-      # guaranteed to only return an array containing the most recent history.
-      #
-      scope :current, -> { where(history_ended_at: nil).order(id: :desc).limit(1) }
+      scope :current, -> { where(history_ended_at: nil).order(id: :desc) }
 
       #
       # A History class will be linked to the user
