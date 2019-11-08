@@ -7,7 +7,9 @@ Losing data sucks. Every time you update or destroy a record in Rails, you lose 
 The Audited gem has some serious flaws.
 
 🤚Hands up if your `versions` table has gotten too big to query 🤚
+
 🤚Hands up if your `versions` table doesn't have the indexes you need 🤚
+
 🤚Hands up if you've ever iterated over `versions` records in Ruby to recreate a snapshot of what data looked like at a point in time.
 
 Why does this happen?
