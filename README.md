@@ -1,40 +1,73 @@
-# historiographer
+# Historiographer
 
-Losing data sucks. Every time you update a record in Rails, by default, you lose the old data.
-
-Supported for PostgreSQL and MySQL. If you need other adapters, help us make one!
+Losing data sucks. Every time you update or destroy a record in Rails, you lose the old data.
 
 ## Existing auditing gems for Rails suck
 
 The Audited gem has some serious flaws.
 
-First, it only tracks a record of what changed, so there's no way to "go back in time" and see what the data looked like back when a problem occurred without replaying every single audit.
+🤚Hands up if your `versions` table has gotten too big to query 🤚
+🤚Hands up if your `versions` table doesn't have the indexes you need 🤚
+🤚Hands up if you've ever iterated over `versions` records in Ruby to recreate a snapshot of what data looked like at a point in time.
+
+Why does this happen?
+
+First, `audited` only tracks a record of what changed, so there's no way to "go back in time" and see what the data looked like back when a problem occurred without replaying every single audit.
 
 Second, it tracks changes as JSON. While some data stores have JSON querying semantics, not all do, making it very hard to ask complex questions of your historical data -- that's the whole reason you're keeping it around.
 
-Third, it doesn't maintain efficient indexes on your data. If you maintain an index on the primary records, wouldn't you also want to look up historical records using the same columns? Historical data is MUCH larger than "latest snapshot" data, so, duh, of course you do.
+Third, it doesn't maintain indexes on your data. If you maintain an index on the primary table, wouldn't you also want to look up historical records using the same columns? Historical data is MUCH larger than "latest snapshot" data, so, duh, of course you do.
 
-Finally, Audited creates one table for every audit. As mentioned before, historical data is big. It's not unusual for an audited gem table to get into the many millions of rows, and need to be constnatly partitioned to maintain any kind of efficiency.
+Finally, Audited creates just one table for all audits. Historical data is big. It's not unusual for an audited gem table to get into the many millions of rows, and need to be constantly partitioned to maintain any kind of efficiency.
 
-## How does Historiographer solve the problem?
+## How does Historiographer solve these problems?
 
-You have existing code written in Rails, so our existing queries need to Just Work.
+Historiographer introduces the concept of _history tables:_ append-only tables that have the same structure and indexes as your primary table.
 
-Moreover, there are benefits to the Active Record model of updating records in place: the latest snapshot is cached, and accessing it is efficient.
+If you have a `posts` table:
 
-So how can we get the benefits of caching but NOT losing data, and continue to create, update, and destroy like we normally would in Rails?
+| id | title |
+| :----------- | :----------- |
+| 1      | My Great Post       |
+| 2 | My Second Post |
 
-Historiographer introduces the concept of _history tables:_ tables that have the exact same structure as tables storing the latest snapshots of data. So if you have a `posts` table, you'll also have a `post_histories` table with all the same columns and indexes.
+You'll also have a `post_histories_table`:
 
-Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would. If the changes are successful, it also inserts a new history snapshot in the histories table--an exact snapshot of the data at that point in time.
+| id | post_id | title | history_started_at | history_ended_at | history_user_id |
+| :----------- | :----------- | :----------- | :----------- | :----------- | :----------- |
+| 1      | 1 | My Great Post | '2019-11-08' | NULL | 1 |
+| 2 | 2| My Second Post | '2019-11-08' | NULL | 1 |
 
-These tables feature two useful indexes: `history_started_at` and `history_ended_at`, which allow you to see what the data looked like and when. You can easily create views which show the total lifecycle of a piece of data, or restore earlier versions directly from these snapshots.
+If you change the title of the 1st post:
 
-And of course, it contains a migrations tool to help you write the same migrations you normally would without having to worry about also synchronizing histories tables.
+```Post.find(1).update(title: "Title With Better SEO")```
 
-# basic use
+You'll expect your `posts` table to be updated directly:
 
-## migrations
+| id | title |
+| :----------- | :----------- |
+| 1      | Title With Better SEO |
+| 2 | My Second Post |
+
+But also, your `histories` table will be updated:
+
+| id | post_id | title | history_started_at | history_ended_at | history_user_id |
+| :----------- | :----------- | :----------- | :----------- | :----------- | :----------- |
+| 1      | 1 | My Great Post | '2019-11-08' | '2019-11-09' | 1 |
+| 2 | 2| My Second Post | '2019-11-08' | NULL | 1 |
+| 1      | 1 | Title With Better SEO | '2019-11-09' | NULL | 1 |
+
+A few things have happened here:
+
+1. The primary table (`posts`) is updated directly
+2. The existing history for `post_id=1` is timestamped when its `history_ended_at`, so that we can see when the post had the title "My Great Post"
+3. A new history record is appended to the table containing a complete snapshot of the record, and a `NULL` `history_ended_at`. That's because this is the current history. You can always find the current snapshots of records either by querying the primary table (`posts`), or querying the `histories` table using `history_ended_at IS NULL`.
+
+# Getting Started
+
+Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would. 
+
+## Create A Migration
 
 You need a separate table to store histories for each model.
 
@@ -80,7 +113,7 @@ Additionally it will add indices on:
 - The same columns that had indices on the original model (e.g. `enabled`)
 - `history_started_at`, `history_ended_at`, and `history_user_id`
 
-### what to do when generated index names are too long
+### What to do when generated index names are too long
 
 Sometimes the generated index names are too long. Just like with standard Rails migrations, you can override the name of the index to fix this problem. To do so, use the `index_names` argument to override individual index names:
 
@@ -98,7 +131,7 @@ class CreatePostHistories < ActiveRecord::Migration
 end
 ```
 
-## models
+## Models
 
 The primary model should include `Historiographer`:
 
@@ -125,6 +158,18 @@ p.histories.first.class
 
 p.histories.first.post == p
 # => true
+```
+
+## Creating, Updating, and Destroying Data:
+
+You can just use normal ActiveRecord methods, and all will record histories:
+
+```ruby
+Post.create(title: "My Great Title")
+Post.find_by(title: "My Great Title").update(title: "A New Title")
+Post.update_all(title: "They're all the same!")
+Post.last.destroy!
+Post.destroy_all
 ```
 
 The `histories` classes have a `current` method, which only finds current history records. These records will also be the same as the data in the primary table.
