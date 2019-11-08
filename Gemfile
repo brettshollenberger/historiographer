@@ -4,6 +4,7 @@ ruby "2.6.3"
 gem "activerecord", "~> 5.1"
 gem "activesupport"
 gem "rollbar"
+gem "activerecord-import"
 
 group :development, :test do
   gem "pg"
@@ -26,4 +27,5 @@ group :test do
   gem "guard"
   gem "guard-rspec"
   gem "database_cleaner"
+  gem "factory_bot_rails"
 end

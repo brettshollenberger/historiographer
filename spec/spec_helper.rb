@@ -2,6 +2,10 @@ ENV["HISTORIOGRAPHY_ENV"] = "test"
 
 require_relative "../init.rb"
 require "ostruct"
+require "factory_bot"
+
+FactoryBot.definition_file_paths = %w{./factories ./spec/factories}
+FactoryBot.find_definitions
 
 RSpec.configure do |config|
   config.expect_with :rspec do |expectations|
@@ -36,5 +40,13 @@ RSpec.configure do |config|
     DatabaseCleaner.cleaning do
       example.run
     end
+  end
+
+  config.before(:each, :logsql) do
+    ActiveRecord::Base.logger = Logger.new(STDOUT)
+  end
+
+  config.after(:each, :logsql) do
+    ActiveRecord::Base.logger = nil
   end
 end

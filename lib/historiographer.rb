@@ -249,5 +249,9 @@ module Historiographer
     def history_class
       "#{name}History".constantize
     end
+
+    def relation
+      super.tap { |r| r.extend Historiographer::Relation }
+    end
   end
 end
