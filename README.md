@@ -2,6 +2,8 @@
 
 Losing data sucks. Every time you update or destroy a record in Rails, you lose the old data.
 
+Historiographer fixes this problem in a better way than existing auditing gems.
+
 ## Existing auditing gems for Rails suck
 
 The Audited gem has some serious flaws.
