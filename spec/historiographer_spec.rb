@@ -176,6 +176,8 @@ describe Historiographer do
 
           expect(ThingWithoutHistory.all.map(&:name)).to all(eq "Thing 3")
           expect(ThingWithoutHistory.all).to_not respond_to :has_histories?
+          expect(ThingWithoutHistory.all).to_not respond_to :update_all_without_history
+          expect(ThingWithoutHistory.all).to_not respond_to :delete_all_without_history
         end
         
         it "respects safety" do
@@ -259,6 +261,16 @@ describe Historiographer do
           expect(PostHistory.current.map(&:history_user_id)).to all(eq 1)
           expect(PostHistory.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
           expect(PostHistory.where(history_ended_at: nil).count).to eq 3
+          expect(Post.count).to eq 0
+          Timecop.return
+        end
+
+        it "destroys without histories" do
+          Timecop.freeze
+          posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
+          Post.all.destroy_all_without_history
+          expect(PostHistory.count).to eq 3
+          expect(PostHistory.current.count).to eq 3
           expect(Post.count).to eq 0
           Timecop.return
         end

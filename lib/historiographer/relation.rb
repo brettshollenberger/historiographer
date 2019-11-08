@@ -83,6 +83,10 @@ module Historiographer
       end
     end
 
+    def destroy_all_without_history
+      records.each(&:destroy_without_history).tap { reset }
+    end
+
     def destroy_all(history_user_id: nil)
       records.each { |r| r.destroy(history_user_id: history_user_id) }.tap { reset }
     end
