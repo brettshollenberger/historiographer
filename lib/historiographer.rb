@@ -2,6 +2,7 @@ require "active_support/all"
 require_relative "./historiographer/history"
 require_relative "./historiographer/postgres_migration"
 require_relative "./historiographer/safe"
+require_relative "./historiographer/relation"
 
 # Historiographer takes "histories" (think audits or snapshots) of your model whenever you make changes.
 #
