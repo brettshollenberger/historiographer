@@ -91,7 +91,9 @@ module Historiographer
     end
 
     alias_method :destroy_without_history, :destroy
-    def destroy_with_history(history_user_id: )
+    def destroy_with_history(history_user_id: nil)
+      history_user_absent_action if history_user_id.nil?
+
       current_history = histories.where(history_ended_at: nil).order("id desc").limit(1).last
       current_history.update!(history_ended_at: UTC.now) if current_history.present?
 

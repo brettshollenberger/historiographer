@@ -10,6 +10,7 @@ end
 
 class SafePost < ActiveRecord::Base
   include Historiographer::Safe
+  acts_as_paranoid
 end
 
 class SafePostHistory < ActiveRecord::Base
@@ -444,6 +445,30 @@ describe Historiographer do
       expect(Post.unscoped.where(deleted_at: nil).count).to eq 0
       expect(PostHistory.where.not(deleted_at: nil).count).to eq 1
       expect(PostHistory.last.history_user_id).to eq 2
+    end
+
+    it "works with Historiographer::Safe" do
+      post = SafePost.create(title: "HELLO", body: "YO", author_id: 1)
+
+      expect {
+        post.destroy
+      }.to_not raise_error
+
+      expect(SafePost.count).to eq 0
+      expect(post.deleted_at).to_not be_nil
+      expect(SafePostHistory.count).to eq 2
+      expect(SafePostHistory.current.last.deleted_at).to eq post.deleted_at
+
+      post2 = SafePost.create(title: "HELLO", body: "YO", author_id: 1)
+
+      expect {
+        post2.destroy!
+      }.to_not raise_error
+
+      expect(SafePost.count).to eq 0
+      expect(post2.deleted_at).to_not be_nil
+      expect(SafePostHistory.count).to eq 4
+      expect(SafePostHistory.current.where(safe_post_id: post2.id).last.deleted_at).to eq post2.deleted_at
     end
   end
 
