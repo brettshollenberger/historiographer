@@ -15,35 +15,42 @@ module Historiographer
         super(updates)
       else
         updates.symbolize_keys!
+        model_changes = updates.except(:history_user_id)
 
         ActiveRecord::Base.transaction do
-          super(updates.except(:history_user_id))
-          now = UTC.now
-          records = self.reload
-          history_class = records.klass.history_class
-
-          records.new.send(:history_user_absent_action) if updates[:history_user_id].nil?
-          history_user_id = updates[:history_user_id]
-
-          new_histories = records.map do |record|
-            attrs         = record.attributes.clone
-            foreign_key   = history_class.history_foreign_key
-      
-            now = UTC.now
-            attrs.merge!(foreign_key => attrs["id"], history_started_at: now, history_user_id: history_user_id)
-      
-            attrs = attrs.except("id")
-
-            record.histories.build(attrs)
+          changed_records = select do |record|
+            !(record.attributes.symbolize_keys >= model_changes)
           end
 
-          current_histories = history_class.current.where("#{history_class.history_foreign_key} IN (?)", records.map(&:id))
-
-          current_histories.update_all(history_ended_at: now)
-
-          history_class.import new_histories
+          super(model_changes)
+          bulk_record_history(self.reload.where(id: changed_records.pluck(:id)), updates)
         end
       end
+    end
+
+    def bulk_record_history(records, updates = {})
+      now = UTC.now
+      history_class = self.klass.history_class
+
+      records.new.send(:history_user_absent_action) if updates[:history_user_id].nil?
+      history_user_id = updates[:history_user_id]
+
+      new_histories = records.map do |record|
+        attrs         = record.attributes.clone
+        foreign_key   = history_class.history_foreign_key
+  
+        attrs.merge!(foreign_key => attrs["id"], history_started_at: now, history_user_id: history_user_id)
+  
+        attrs = attrs.except("id")
+
+        record.histories.build(attrs)
+      end
+
+      current_histories = history_class.current.where("#{history_class.history_foreign_key} IN (?)", records.map(&:id))
+
+      current_histories.update_all(history_ended_at: now)
+
+      history_class.import new_histories
     end
 
     def delete_all_without_history
