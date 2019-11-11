@@ -164,9 +164,14 @@ describe Historiographer do
           expect(posts.second.current_history.title).to eq "My New Post Title"
           expect(posts.third.current_history.title).to eq "Brett's Post"
 
+          # It does not update histories if nothing changed
+          Post.all.update_all(title: "Brett's Post", history_user_id: 1)
+          posts = Post.all.reload.order(:id)
+          expect(posts.map(&:histories).map(&:count)).to all(eq 3)
+
           posts.update_all_without_history(title: "Untracked")
           expect(posts.first.histories.count).to eq 3
-          expect(posts.second.histories.count).to eq 2
+          expect(posts.second.histories.count).to eq 3
           expect(posts.third.histories.count).to eq 3
 
           thing1 = ThingWithoutHistory.create(name: "Thing 1")
