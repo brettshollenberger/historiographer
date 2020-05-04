@@ -25,7 +25,7 @@ module Historiographer
       private
 
       def history_user_absent_action
-        Rollbar.error("history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history")
+        nil
       end
     end
 
