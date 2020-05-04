@@ -198,7 +198,7 @@ require "historiographer/postgres_migration"
 class CreatePostHistories < ActiveRecord::Migration
   def change
     create_table :post_histories do |t|
-      t.histories, index_names: {
+      t.histories index_names: {
         title: "my_index_name",
         [:compound, :index] => "my_compound_index_name"
       }
