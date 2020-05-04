@@ -207,6 +207,15 @@ class CreatePostHistories < ActiveRecord::Migration
 end
 ```
 
+== Mysql Install
+
+For contributors on OSX, you may have difficulty installing mysql:
+ 
+```
+gem install mysql2 -v '0.4.10' --source 'https://rubygems.org/' -- --with-ldflags=-L/usr/local/opt/openssl/lib --with-cppflags=-I/usr/local/opt/openssl/include
+```
+
+
 == Copyright
 
 Copyright (c) 2016-2020 brettshollenberger. See LICENSE.txt for
