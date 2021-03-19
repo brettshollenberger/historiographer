@@ -59,7 +59,7 @@ But also, your `histories` table will be updated:
 | :----------- | :----------- | :----------- | :----------- | :----------- | :----------- |
 | 1      | 1 | My Great Post | '2019-11-08' | '2019-11-09' | 1 |
 | 2 | 2| My Second Post | '2019-11-08' | NULL | 1 |
-| 1      | 1 | Title With Better SEO | '2019-11-09' | NULL | 1 |
+| 3      | 1 | Title With Better SEO | '2019-11-09' | NULL | 1 |
 
 A few things have happened here:
 
