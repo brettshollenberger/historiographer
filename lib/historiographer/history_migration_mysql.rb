@@ -16,15 +16,17 @@ module Historiographer
     # Will automatically add user_id, history_started_at,
     # and history_ended_at columns
     #
-    def histories(except: [], only: [], no_business_columns: false)
-      original_table_name = self.name.gsub(/_histories$/) {}.pluralize
-      foreign_key         = original_table_name.singularize.foreign_key
+    def histories(except: [], only: [], no_business_columns: false, index_names: {})
+      index_names.symbolize_keys!
+
+      original_table_name = self.name.gsub(/_histories$/) { }.pluralize
+      foreign_key = original_table_name.singularize.foreign_key
 
       class_definer = Class.new(ActiveRecord::Base) do
       end
 
       class_name = original_table_name.classify
-      klass      = Object.const_set(class_name, class_definer)
+      klass = Object.const_set(class_name, class_definer)
       original_columns = klass.columns.reject { |c| c.name == "id" || except.include?(c.name) || (only.any? && only.exclude?(c.name)) || no_business_columns }
 
       integer foreign_key.to_sym, null: false
@@ -48,7 +50,6 @@ module Historiographer
       ActiveRecord::Base.connection.indexes(original_table_name).each do |index|
         index index.columns
       end
-
     end
   end
 end

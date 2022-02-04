@@ -1,21 +1,29 @@
-example_id                              | status | run_time        |
---------------------------------------- | ------ | --------------- |
-./spec/historiographer_spec.rb[1:1:1]   | passed | 0.00794 seconds |
-./spec/historiographer_spec.rb[1:1:2]   | passed | 0.04572 seconds |
-./spec/historiographer_spec.rb[1:1:3]   | passed | 0.03308 seconds |
-./spec/historiographer_spec.rb[1:2:1]   | passed | 0.0742 seconds  |
-./spec/historiographer_spec.rb[1:2:2]   | passed | 0.00138 seconds |
-./spec/historiographer_spec.rb[1:2:3:1] | passed | 0.01369 seconds |
-./spec/historiographer_spec.rb[1:2:3:2] | passed | 0.059 seconds   |
-./spec/historiographer_spec.rb[1:2:3:3] | passed | 0.00794 seconds |
-./spec/historiographer_spec.rb[1:2:4]   | passed | 0.00348 seconds |
-./spec/historiographer_spec.rb[1:2:5]   | passed | 0.03144 seconds |
-./spec/historiographer_spec.rb[1:2:6]   | passed | 0.01239 seconds |
-./spec/historiographer_spec.rb[1:3:1]   | passed | 0.04853 seconds |
-./spec/historiographer_spec.rb[1:4:1]   | passed | 0.03917 seconds |
-./spec/historiographer_spec.rb[1:5:1]   | passed | 0.03402 seconds |
-./spec/historiographer_spec.rb[1:5:2]   | passed | 0.02494 seconds |
-./spec/historiographer_spec.rb[1:6:1]   | passed | 0.0287 seconds  |
-./spec/historiographer_spec.rb[1:7:1]   | passed | 0.07329 seconds |
-./spec/historiographer_spec.rb[1:7:2]   | passed | 0.01293 seconds |
-./spec/historiographer_spec.rb[1:8:1]   | passed | 0.08211 seconds |
+example_id                                | status | run_time        |
+----------------------------------------- | ------ | --------------- |
+./spec/historiographer_spec.rb[1:1:1]     | passed | 0.00973 seconds |
+./spec/historiographer_spec.rb[1:1:2]     | passed | 0.01848 seconds |
+./spec/historiographer_spec.rb[1:1:3]     | passed | 0.0092 seconds  |
+./spec/historiographer_spec.rb[1:2:1]     | passed | 0.02492 seconds |
+./spec/historiographer_spec.rb[1:2:2]     | passed | 0.00099 seconds |
+./spec/historiographer_spec.rb[1:2:3:1:1] | passed | 0.13892 seconds |
+./spec/historiographer_spec.rb[1:2:3:1:2] | passed | 0.1202 seconds  |
+./spec/historiographer_spec.rb[1:2:3:2:1] | passed | 0.02734 seconds |
+./spec/historiographer_spec.rb[1:2:3:2:2] | passed | 0.04699 seconds |
+./spec/historiographer_spec.rb[1:2:3:2:3] | passed | 0.02185 seconds |
+./spec/historiographer_spec.rb[1:2:3:3:1] | passed | 0.08042 seconds |
+./spec/historiographer_spec.rb[1:2:3:3:2] | passed | 0.02825 seconds |
+./spec/historiographer_spec.rb[1:2:4:1]   | passed | 0.02411 seconds |
+./spec/historiographer_spec.rb[1:2:4:2]   | passed | 0.01286 seconds |
+./spec/historiographer_spec.rb[1:2:4:3]   | passed | 0.00469 seconds |
+./spec/historiographer_spec.rb[1:2:5]     | passed | 0.00478 seconds |
+./spec/historiographer_spec.rb[1:2:6]     | passed | 0.0035 seconds  |
+./spec/historiographer_spec.rb[1:2:7]     | passed | 0.01157 seconds |
+./spec/historiographer_spec.rb[1:3:1]     | passed | 0.09042 seconds |
+./spec/historiographer_spec.rb[1:4:1]     | passed | 0.05553 seconds |
+./spec/historiographer_spec.rb[1:5:1]     | passed | 0.0104 seconds  |
+./spec/historiographer_spec.rb[1:5:2]     | passed | 0.00905 seconds |
+./spec/historiographer_spec.rb[1:6:1]     | passed | 0.02652 seconds |
+./spec/historiographer_spec.rb[1:6:2]     | passed | 0.04419 seconds |
+./spec/historiographer_spec.rb[1:7:1]     | passed | 0.02102 seconds |
+./spec/historiographer_spec.rb[1:8:1]     | passed | 0.02556 seconds |
+./spec/historiographer_spec.rb[1:9:1]     | passed | 0.01444 seconds |

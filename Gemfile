@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 ruby "2.6.3"
 
-gem "activerecord", "~> 5.1"
+gem "activerecord", "~> 6"
 gem "activesupport"
 gem "rollbar"
 gem "activerecord-import"
@@ -9,7 +9,7 @@ gem "activerecord-import"
 group :development, :test do
   gem "pg"
   gem "pry"
-  gem "mysql2", "0.4.10"
+  gem "mysql2", "0.5"
   gem "standalone_migrations"
   gem "timecop"
   gem "paranoia"
