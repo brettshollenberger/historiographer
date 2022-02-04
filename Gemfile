@@ -1,7 +1,7 @@
 source "https://rubygems.org"
 ruby "2.6.3"
 
-gem "activerecord", "~> 6"
+gem "activerecord", ">= 5"
 gem "activesupport"
 gem "rollbar"
 gem "activerecord-import"
