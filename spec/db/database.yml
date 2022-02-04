@@ -1,14 +1,13 @@
-default: &default
+development:
   adapter: postgresql
   prepared_statements: false
   url: "postgres://localhost/historiographer_development"
 
-development:
-  <<: *default
-
 test:
   adapter: postgresql
   database: historiographer_test
+  url: "postgres://localhost/historiographer_test"
+
 # mysql_default: &mysql_default
 #   adapter: mysql2
 #   encoding: utf8

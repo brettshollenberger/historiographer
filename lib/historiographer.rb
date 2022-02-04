@@ -91,6 +91,7 @@ module Historiographer
     end
 
     alias_method :destroy_without_history, :destroy
+
     def destroy_with_history(history_user_id: nil)
       history_user_absent_action if history_user_id.nil?
 
@@ -106,6 +107,7 @@ module Historiographer
         @no_history = false
       end
     end
+
     alias_method :destroy, :destroy_with_history
 
     def assign_attributes(new_attributes)
@@ -113,7 +115,7 @@ module Historiographer
 
       if huid.present?
         self.class.nested_attributes_options.each do |association, _|
-          reflection  = self.class.reflect_on_association(association)
+          reflection = self.class.reflect_on_association(association)
           assoc_attrs = new_attributes["#{association}_attributes"]
 
           if assoc_attrs.present?
@@ -134,11 +136,12 @@ module Historiographer
     def historiographer_changes?
       case Rails.version.to_f
       when 0..5 then changed? && valid?
-      when 5.1..6 then saved_changes?
+      when 5.1..7 then saved_changes?
       else
         raise "Unsupported Rails version"
       end
     end
+
     #
     # If there are any changes, and the model is valid,
     # and we're not force-overriding history recording,
@@ -195,6 +198,7 @@ module Historiographer
         end
       end
     end
+
     base.send(:prepend, UpdateColumnsWithHistory)
 
     def save_without_history(*args, &block)
@@ -224,9 +228,9 @@ module Historiographer
     def record_history
       history_user_absent_action if history_user_id.nil?
 
-      attrs         = attributes.clone
+      attrs = attributes.clone
       history_class = self.class.history_class
-      foreign_key   = history_class.history_foreign_key
+      foreign_key = history_class.history_foreign_key
 
       now = UTC.now
       attrs.merge!(foreign_key => attrs["id"], history_started_at: now, history_user_id: history_user_id)
