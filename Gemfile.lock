@@ -194,7 +194,7 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  activerecord (~> 6)
+  activerecord (>= 5)
   activerecord-import
   activesupport
   bundler (~> 1.0)
