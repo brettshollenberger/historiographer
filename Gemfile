@@ -1,31 +1,33 @@
-source "https://rubygems.org"
-ruby "2.6.3"
+# frozen_string_literal: true
 
-gem "activerecord", ">= 5"
-gem "activesupport"
-gem "rollbar"
-gem "activerecord-import"
+source 'https://rubygems.org'
+ruby '2.6.3'
+
+gem 'activerecord', '>= 6'
+gem 'activerecord-import'
+gem 'activesupport'
+gem 'rollbar'
 
 group :development, :test do
-  gem "pg"
-  gem "pry"
-  gem "mysql2", "0.5"
-  gem "standalone_migrations"
-  gem "timecop"
-  gem "paranoia"
+  gem 'mysql2', '0.5'
+  gem 'paranoia'
+  gem 'pg'
+  gem 'pry'
+  gem 'standalone_migrations'
+  gem 'timecop'
 end
 
 group :development do
-  gem "rdoc", "~> 3.12"
-  gem "bundler", "~> 1.0"
-  gem "jeweler", git: "https://github.com/technicalpickles/jeweler", branch: "master"
-  gem "simplecov", ">= 0"
+  gem 'bundler', '~> 1.0'
+  gem 'jeweler', git: 'https://github.com/technicalpickles/jeweler', branch: 'master'
+  gem 'rdoc', '~> 3.12'
+  gem 'simplecov', '>= 0'
 end
 
 group :test do
-  gem "rspec"
-  gem "guard"
-  gem "guard-rspec"
-  gem "database_cleaner"
-  gem "factory_bot_rails"
+  gem 'database_cleaner'
+  gem 'factory_bot_rails'
+  gem 'guard'
+  gem 'guard-rspec'
+  gem 'rspec'
 end
