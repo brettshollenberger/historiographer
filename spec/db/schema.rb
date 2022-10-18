@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2019_10_24_203106) do
+ActiveRecord::Schema.define(version: 2022_10_18_204255) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -115,6 +115,44 @@ ActiveRecord::Schema.define(version: 2019_10_24_203106) do
     t.index ["deleted_at"], name: "index_safe_posts_on_deleted_at"
     t.index ["enabled"], name: "index_safe_posts_on_enabled"
     t.index ["live_at"], name: "index_safe_posts_on_live_at"
+  end
+
+  create_table "silent_post_histories", force: :cascade do |t|
+    t.integer "silent_post_id", null: false
+    t.string "title", null: false
+    t.text "body", null: false
+    t.integer "author_id", null: false
+    t.boolean "enabled", default: false
+    t.datetime "live_at"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.index ["author_id"], name: "index_silent_post_histories_on_author_id"
+    t.index ["deleted_at"], name: "index_silent_post_histories_on_deleted_at"
+    t.index ["enabled"], name: "index_silent_post_histories_on_enabled"
+    t.index ["history_ended_at"], name: "index_silent_post_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_silent_post_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_silent_post_histories_on_history_user_id"
+    t.index ["live_at"], name: "index_silent_post_histories_on_live_at"
+    t.index ["silent_post_id"], name: "index_silent_post_histories_on_silent_post_id"
+  end
+
+  create_table "silent_posts", force: :cascade do |t|
+    t.string "title", null: false
+    t.text "body", null: false
+    t.integer "author_id", null: false
+    t.boolean "enabled", default: false
+    t.datetime "live_at"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_silent_posts_on_author_id"
+    t.index ["deleted_at"], name: "index_silent_posts_on_deleted_at"
+    t.index ["enabled"], name: "index_silent_posts_on_enabled"
+    t.index ["live_at"], name: "index_silent_posts_on_live_at"
   end
 
   create_table "thing_with_compound_index_histories", force: :cascade do |t|

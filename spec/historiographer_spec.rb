@@ -1,4 +1,6 @@
-require "spec_helper"
+# frozen_string_literal: true
+
+require 'spec_helper'
 
 class Post < ActiveRecord::Base
   include Historiographer
@@ -14,6 +16,14 @@ class SafePost < ActiveRecord::Base
 end
 
 class SafePostHistory < ActiveRecord::Base
+end
+
+class SilentPost < ActiveRecord::Base
+  include Historiographer::Silent
+  acts_as_paranoid
+end
+
+class SilentPostHistory < ActiveRecord::Base
 end
 
 class Author < ActiveRecord::Base
@@ -45,7 +55,7 @@ describe Historiographer do
     Timecop.return
   end
 
-  let(:username) { "Test User" }
+  let(:username) { 'Test User' }
 
   let(:user) do
     User.create(name: username)
@@ -53,8 +63,8 @@ describe Historiographer do
 
   let(:create_post) do
     Post.create(
-      title: "Post 1",
-      body: "Great post",
+      title: 'Post 1',
+      body: 'Great post',
       author_id: 1,
       history_user_id: user.id
     )
@@ -62,43 +72,43 @@ describe Historiographer do
 
   let(:create_author) do
     Author.create(
-      full_name: "Breezy",
+      full_name: 'Breezy',
       history_user_id: user.id
     )
   end
 
-  describe "History counting" do
-    it "creates history on creation of primary model record" do
-      expect {
+  describe 'History counting' do
+    it 'creates history on creation of primary model record' do
+      expect do
         create_post
-      }.to change {
+      end.to change {
         PostHistory.count
       }.by 1
     end
 
-    it "appends new history on update" do
+    it 'appends new history on update' do
       post = create_post
 
-      expect {
-        post.update(title: "Better Title")
-      }.to change {
+      expect do
+        post.update(title: 'Better Title')
+      end.to change {
         PostHistory.count
       }.by 1
     end
 
-    it "does not append new history if nothing has changed" do
+    it 'does not append new history if nothing has changed' do
       post = create_post
 
-      expect { 
+      expect do
         post.update(title: post.title)
-      }.to_not change {
+      end.to_not change {
         PostHistory.count
       }
     end
   end
 
-  describe "History recording" do
-    it "records all fields from the parent" do
+  describe 'History recording' do
+    it 'records all fields from the parent' do
       post         = create_post
       post_history = post.histories.first
 
@@ -110,8 +120,8 @@ describe Historiographer do
       expect(post_history.history_ended_at).to be_nil
       expect(post_history.history_user_id).to eq user.id
 
-      post.update(title: "Better title")
-      post_histories = post.histories.reload.order("id asc")
+      post.update(title: 'Better title')
+      post_histories = post.histories.reload.order('id asc')
       first_history  = post_histories.first
       second_history = post_histories.second
 
@@ -119,24 +129,24 @@ describe Historiographer do
       expect(second_history.history_ended_at).to be_nil
     end
 
-    it "cannot create without history_user_id" do
+    it 'cannot create without history_user_id' do
       post = Post.create(
-        title: "Post 1",
-        body: "Great post",
-        author_id: 1,
-      ) 
-      expect(post.errors.to_h).to eq({ :history_user_id => "must be an integer" })
+        title: 'Post 1',
+        body: 'Great post',
+        author_id: 1
+      )
+      expect(post.errors.to_h).to eq(history_user_id: 'must be an integer')
 
-      expect {
+      expect do
         post.send(:record_history)
-      }.to raise_error(
+      end.to raise_error(
         Historiographer::HistoryUserIdMissingError
       )
     end
 
-    context "When directly hitting the database via SQL" do
-      context "#update_all" do
-        it "still updates histories" do
+    context 'When directly hitting the database via SQL' do
+      context '#update_all' do
+        it 'still updates histories' do
           FactoryBot.create_list(:post, 3, history_user_id: 1)
 
           posts = Post.all
@@ -144,12 +154,12 @@ describe Historiographer do
           expect(PostHistory.count).to eq 3
           expect(posts.map(&:histories).map(&:count)).to all (eq 1)
 
-          posts.update_all(title: "My New Post Title", history_user_id: 1)
+          posts.update_all(title: 'My New Post Title', history_user_id: 1)
 
           expect(PostHistory.count).to eq 6
           expect(PostHistory.current.count).to eq 3
           expect(posts.map(&:histories).map(&:count)).to all(eq 2)
-          expect(posts.map(&:current_history).map(&:title)).to all (eq "My New Post Title")
+          expect(posts.map(&:current_history).map(&:title)).to all (eq 'My New Post Title')
           expect(Post.all).to respond_to :has_histories?
 
           # It can update by sub-query
@@ -159,10 +169,10 @@ describe Historiographer do
           expect(posts.second.histories.count).to eq 2
           expect(posts.third.histories.count).to eq 3
           expect(posts.first.title).to eq "Brett's Post"
-          expect(posts.second.title).to eq "My New Post Title"
+          expect(posts.second.title).to eq 'My New Post Title'
           expect(posts.third.title).to eq "Brett's Post"
           expect(posts.first.current_history.title).to eq "Brett's Post"
-          expect(posts.second.current_history.title).to eq "My New Post Title"
+          expect(posts.second.current_history.title).to eq 'My New Post Title'
           expect(posts.third.current_history.title).to eq "Brett's Post"
 
           # It does not update histories if nothing changed
@@ -170,23 +180,23 @@ describe Historiographer do
           posts = Post.all.reload.order(:id)
           expect(posts.map(&:histories).map(&:count)).to all(eq 3)
 
-          posts.update_all_without_history(title: "Untracked")
+          posts.update_all_without_history(title: 'Untracked')
           expect(posts.first.histories.count).to eq 3
           expect(posts.second.histories.count).to eq 3
           expect(posts.third.histories.count).to eq 3
 
-          thing1 = ThingWithoutHistory.create(name: "Thing 1")
-          thing2 = ThingWithoutHistory.create(name: "Thing 2")
+          thing1 = ThingWithoutHistory.create(name: 'Thing 1')
+          thing2 = ThingWithoutHistory.create(name: 'Thing 2')
 
-          ThingWithoutHistory.all.update_all(name: "Thing 3")
+          ThingWithoutHistory.all.update_all(name: 'Thing 3')
 
-          expect(ThingWithoutHistory.all.map(&:name)).to all(eq "Thing 3")
+          expect(ThingWithoutHistory.all.map(&:name)).to all(eq 'Thing 3')
           expect(ThingWithoutHistory.all).to_not respond_to :has_histories?
           expect(ThingWithoutHistory.all).to_not respond_to :update_all_without_history
           expect(ThingWithoutHistory.all).to_not respond_to :delete_all_without_history
         end
-        
-        it "respects safety" do
+
+        it 'respects safety' do
           FactoryBot.create_list(:post, 3, history_user_id: 1)
 
           posts = Post.all
@@ -194,35 +204,35 @@ describe Historiographer do
           expect(PostHistory.count).to eq 3
           expect(posts.map(&:histories).map(&:count)).to all (eq 1)
 
-          expect {
-            posts.update_all(title: "My New Post Title")
-          }.to raise_error
+          expect do
+            posts.update_all(title: 'My New Post Title')
+          end.to raise_error
 
           posts.reload.map(&:title).each do |title|
-            expect(title).to_not eq "My New Post Title"
+            expect(title).to_not eq 'My New Post Title'
           end
 
           SafePost.create(
-            title: "Post 1",
-            body: "Great post",
-            author_id: 1,
+            title: 'Post 1',
+            body: 'Great post',
+            author_id: 1
           )
 
           safe_posts = SafePost.all
 
-          expect {
-            safe_posts.update_all(title: "New One")
-          }.to_not raise_error
+          expect do
+            safe_posts.update_all(title: 'New One')
+          end.to_not raise_error
 
-          expect(safe_posts.map(&:title)).to all(eq "New One")
+          expect(safe_posts.map(&:title)).to all(eq 'New One')
         end
       end
 
-      context "#delete_all" do
-        it "includes histories when not paranoid" do
+      context '#delete_all' do
+        it 'includes histories when not paranoid' do
           Timecop.freeze
           authors = 3.times.map do
-            Author.create(full_name: "Brett", history_user_id: 1)
+            Author.create(full_name: 'Brett', history_user_id: 1)
           end
           Author.delete_all(history_user_id: 1)
           expect(AuthorHistory.count).to eq 3
@@ -232,7 +242,7 @@ describe Historiographer do
           Timecop.return
         end
 
-        it "includes histories when paranoid" do
+        it 'includes histories when paranoid' do
           Timecop.freeze
           posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
           Post.delete_all(history_user_id: 1)
@@ -246,9 +256,9 @@ describe Historiographer do
           Timecop.return
         end
 
-        it "allows delete_all_without_history" do
+        it 'allows delete_all_without_history' do
           authors = 3.times.map do
-            Author.create(full_name: "Brett", history_user_id: 1)
+            Author.create(full_name: 'Brett', history_user_id: 1)
           end
           Author.all.delete_all_without_history
           expect(AuthorHistory.current.count).to eq 3
@@ -256,8 +266,8 @@ describe Historiographer do
         end
       end
 
-      context "#destroy_all" do
-        it "includes histories" do
+      context '#destroy_all' do
+        it 'includes histories' do
           Timecop.freeze
           posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
           Post.destroy_all(history_user_id: 1)
@@ -271,7 +281,7 @@ describe Historiographer do
           Timecop.return
         end
 
-        it "destroys without histories" do
+        it 'destroys without histories' do
           Timecop.freeze
           posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
           Post.all.destroy_all_without_history
@@ -283,79 +293,125 @@ describe Historiographer do
       end
     end
 
-    context "When Safe mode" do
-      it "creates history without history_user_id" do
-        expect(Rollbar).to receive(:error).with("history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history")
+    context 'When Safe mode' do
+      it 'creates history without history_user_id' do
+        expect(Rollbar).to receive(:error).with('history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history')
 
         post = SafePost.create(
-          title: "Post 1",
-          body: "Great post",
-          author_id: 1,
-        ) 
+          title: 'Post 1',
+          body: 'Great post',
+          author_id: 1
+        )
         expect(post.errors.to_h.keys).to be_empty
         expect(post).to be_persisted
         expect(post.histories.count).to eq 1
         expect(post.histories.first.history_user_id).to be_nil
       end
 
-      it "creates history with history_user_id" do
+      it 'creates history with history_user_id' do
         expect(Rollbar).to_not receive(:error)
 
         post = SafePost.create(
-          title: "Post 1",
-          body: "Great post",
+          title: 'Post 1',
+          body: 'Great post',
           author_id: 1,
           history_user_id: user.id
-        ) 
+        )
         expect(post.errors.to_h.keys).to be_empty
         expect(post).to be_persisted
         expect(post.histories.count).to eq 1
         expect(post.histories.first.history_user_id).to eq user.id
       end
 
-       it "skips history creation if desired" do
+      it 'skips history creation if desired' do
         post = SafePost.new(
-          title: "Post 1",
-          body: "Great post",
+          title: 'Post 1',
+          body: 'Great post',
           author_id: 1
-        ) 
+        )
 
         post.save_without_history
         expect(post).to be_persisted
         expect(post.histories.count).to eq 0
-       end
+      end
     end
 
-    it "can override without history_user_id" do
-      expect { 
-        post = Post.new(
-          title: "Post 1",
-          body: "Great post",
+    context 'When Silent mode' do
+      it 'creates history without history_user_id' do
+        expect(Rollbar).to_not receive(:error)
+
+        post = SilentPost.create(
+          title: 'Post 1',
+          body: 'Great post',
+          author_id: 1
+        )
+        expect(post.errors.to_h.keys).to be_empty
+        expect(post).to be_persisted
+        expect(post.histories.count).to eq 1
+        expect(post.histories.first.history_user_id).to be_nil
+
+        post.update(title: 'New Title')
+        post.reload
+        expect(post.title).to eq 'New Title' # No error was raised
+      end
+
+      it 'creates history with history_user_id' do
+        expect(Rollbar).to_not receive(:error)
+
+        post = SilentPost.create(
+          title: 'Post 1',
+          body: 'Great post',
           author_id: 1,
-        ) 
+          history_user_id: user.id
+        )
+        expect(post.errors.to_h.keys).to be_empty
+        expect(post).to be_persisted
+        expect(post.histories.count).to eq 1
+        expect(post.histories.first.history_user_id).to eq user.id
+      end
+
+      it 'skips history creation if desired' do
+        post = SilentPost.new(
+          title: 'Post 1',
+          body: 'Great post',
+          author_id: 1
+        )
 
         post.save_without_history
-      }.to_not raise_error
+        expect(post).to be_persisted
+        expect(post.histories.count).to eq 0
+      end
+    end
+    it 'can override without history_user_id' do
+      expect do
+        post = Post.new(
+          title: 'Post 1',
+          body: 'Great post',
+          author_id: 1
+        )
+
+        post.save_without_history
+      end.to_not raise_error
     end
 
-    it "can override without history_user_id" do
-      expect { 
+    it 'can override without history_user_id' do
+      expect do
         post = Post.new(
-          title: "Post 1",
-          body: "Great post",
-          author_id: 1,
-        ) 
+          title: 'Post 1',
+          body: 'Great post',
+          author_id: 1
+        )
 
         post.save_without_history!
-      }.to_not raise_error
+      end.to_not raise_error
     end
 
-    it "does not record histories when main model fails to save" do
+    it 'does not record histories when main model fails to save' do
       class Post
         after_save :raise_error, prepend: true
 
         def raise_error
-          raise "Oh no, db issue!"
+          raise 'Oh no, db issue!'
         end
       end
 
@@ -367,21 +423,21 @@ describe Historiographer do
     end
   end
 
-  describe "Scopes" do
-    it "finds current histories" do
+  describe 'Scopes' do
+    it 'finds current histories' do
       post1 = create_post
-      post1.update(title: "Better title")
+      post1.update(title: 'Better title')
 
       post2 = create_post
-      post2.update(title: "Better title")
+      post2.update(title: 'Better title')
 
-      expect(PostHistory.current.pluck(:title)).to all eq "Better title"
-      expect(post1.current_history.title).to eq "Better title"
+      expect(PostHistory.current.pluck(:title)).to all eq 'Better title'
+      expect(post1.current_history.title).to eq 'Better title'
     end
   end
 
-  describe "Associations" do
-    it "names associated records" do
+  describe 'Associations' do
+    it 'names associated records' do
       post1 = create_post
       expect(post1.histories.first).to be_a(PostHistory)
 
@@ -394,27 +450,27 @@ describe Historiographer do
     end
   end
 
-  describe "Histories" do
-    it "does not allow direct updates of histories" do
+  describe 'Histories' do
+    it 'does not allow direct updates of histories' do
       post1 = create_post
       hist1 = post1.histories.first
 
-      expect(hist1.update(title: "A different title")).to be false
+      expect(hist1.update(title: 'A different title')).to be false
       expect(hist1.reload.title).to eq post1.title
 
-      expect(hist1.update!(title: "A different title")).to be false
+      expect(hist1.update!(title: 'A different title')).to be false
       expect(hist1.reload.title).to eq post1.title
 
-      hist1.title = "A different title"
+      hist1.title = 'A different title'
       expect(hist1.save).to be false
       expect(hist1.reload.title).to eq post1.title
 
-      hist1.title = "A different title"
+      hist1.title = 'A different title'
       expect(hist1.save!).to be false
       expect(hist1.reload.title).to eq post1.title
     end
 
-    it "does not allow destroys of histories" do
+    it 'does not allow destroys of histories' do
       post1                  = create_post
       hist1                  = post1.histories.first
       original_history_count = post1.histories.count
@@ -425,19 +481,19 @@ describe Historiographer do
       expect(post1.histories.count).to be original_history_count
     end
   end
-  
-  describe "Deletion" do
-    it "records deleted_at and history_user_id on primary and history if you use acts_as_paranoid" do
+
+  describe 'Deletion' do
+    it 'records deleted_at and history_user_id on primary and history if you use acts_as_paranoid' do
       post = Post.create(
-        title: "Post 1",
-        body: "Great post",
+        title: 'Post 1',
+        body: 'Great post',
         author_id: 1,
         history_user_id: user.id
       )
 
-      expect {
+      expect do
         post.destroy(history_user_id: 2)
-      }.to change {
+      end.to change {
         PostHistory.count
       }.by 1
 
@@ -447,23 +503,23 @@ describe Historiographer do
       expect(PostHistory.last.history_user_id).to eq 2
     end
 
-    it "works with Historiographer::Safe" do
-      post = SafePost.create(title: "HELLO", body: "YO", author_id: 1)
+    it 'works with Historiographer::Safe' do
+      post = SafePost.create(title: 'HELLO', body: 'YO', author_id: 1)
 
-      expect {
+      expect do
         post.destroy
-      }.to_not raise_error
+      end.to_not raise_error
 
       expect(SafePost.count).to eq 0
       expect(post.deleted_at).to_not be_nil
       expect(SafePostHistory.count).to eq 2
       expect(SafePostHistory.current.last.deleted_at).to eq post.deleted_at
 
-      post2 = SafePost.create(title: "HELLO", body: "YO", author_id: 1)
+      post2 = SafePost.create(title: 'HELLO', body: 'YO', author_id: 1)
 
-      expect {
+      expect do
         post2.destroy!
-      }.to_not raise_error
+      end.to_not raise_error
 
       expect(SafePost.count).to eq 0
       expect(post2.deleted_at).to_not be_nil
@@ -472,18 +528,18 @@ describe Historiographer do
     end
   end
 
-  describe "Scopes" do
-    it "finds current" do
+  describe 'Scopes' do
+    it 'finds current' do
       post = create_post
-      post.update(title: "New Title")
-      post.update(title: "New Title 2")
+      post.update(title: 'New Title')
+      post.update(title: 'New Title 2')
 
       expect(PostHistory.current.count).to be 1
     end
   end
 
-  describe "User associations" do
-    it "links to user" do
+  describe 'User associations' do
+    it 'links to user' do
       post = create_post
       author = create_author
 
@@ -492,10 +548,10 @@ describe Historiographer do
     end
   end
 
-  describe "Migrations with compound indexes" do
-    it "supports renaming compound indexes and migrating them to history tables" do
-      indices_sql = %q(
-        SELECT 
+  describe 'Migrations with compound indexes' do
+    it 'supports renaming compound indexes and migrating them to history tables' do
+      indices_sql = "
+        SELECT
           DISTINCT(
             ARRAY_TO_STRING(ARRAY(
              SELECT pg_get_indexdef(idx.indexrelid, k + 1, true)
@@ -514,19 +570,19 @@ describe Historiographer do
         AND a.attnum = ANY(idx.indkey)
         AND t.relkind = 'r'
         AND t.relname = ?;
-      )
+      "
 
       indices_query_array = [indices_sql, :thing_with_compound_index_histories]
       indices_sanitized_query = ThingWithCompoundIndexHistory.send(:sanitize_sql_array, indices_query_array)
 
-      indexes = ThingWithCompoundIndexHistory.connection.execute(indices_sanitized_query).to_a.map(&:values).flatten.map { |i| i.split(",") }
+      indexes = ThingWithCompoundIndexHistory.connection.execute(indices_sanitized_query).to_a.map(&:values).flatten.map { |i| i.split(',') }
 
-      expect(indexes).to include(["history_started_at"])
-      expect(indexes).to include(["history_ended_at"])
-      expect(indexes).to include(["history_user_id"])
-      expect(indexes).to include(["id"])
-      expect(indexes).to include(["key", "value"])
-      expect(indexes).to include(["thing_with_compound_index_id"])
+      expect(indexes).to include(['history_started_at'])
+      expect(indexes).to include(['history_ended_at'])
+      expect(indexes).to include(['history_user_id'])
+      expect(indexes).to include(['id'])
+      expect(indexes).to include(%w[key value])
+      expect(indexes).to include(['thing_with_compound_index_id'])
     end
   end
 end
