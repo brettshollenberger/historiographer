@@ -6,6 +6,7 @@ ruby '2.6.3'
 gem 'activerecord', '>= 6'
 gem 'activerecord-import'
 gem 'activesupport'
+gem 'rails', '>= 6'
 gem 'rollbar'
 
 group :development, :test do
