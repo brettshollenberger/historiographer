@@ -1,8 +1,11 @@
-require "active_support/all"
-require_relative "./historiographer/history"
-require_relative "./historiographer/postgres_migration"
-require_relative "./historiographer/safe"
-require_relative "./historiographer/relation"
+# frozen_string_literal: true
+
+require 'active_support/all'
+require_relative './historiographer/history'
+require_relative './historiographer/postgres_migration'
+require_relative './historiographer/safe'
+require_relative './historiographer/relation'
+require_relative './historiographer/silent'
 
 # Historiographer takes "histories" (think audits or snapshots) of your model whenever you make changes.
 #
@@ -74,7 +77,7 @@ module Historiographer
 
   class HistoryUserIdMissingError < StandardError; end
 
-  UTC = Time.now.in_time_zone("UTC").time_zone
+  UTC = Time.now.in_time_zone('UTC').time_zone
 
   included do |base|
     after_save :record_history, if: :should_record_history?
@@ -86,7 +89,7 @@ module Historiographer
 
     def validate_history_user_id_present
       if @no_history.nil? && (!history_user_id.present? || !history_user_id.is_a?(Integer))
-        errors.add(:history_user_id, "must be an integer")
+        errors.add(:history_user_id, 'must be an integer')
       end
     end
 
@@ -95,7 +98,7 @@ module Historiographer
     def destroy_with_history(history_user_id: nil)
       history_user_absent_action if history_user_id.nil?
 
-      current_history = histories.where(history_ended_at: nil).order("id desc").limit(1).last
+      current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
       current_history.update!(history_ended_at: UTC.now) if current_history.present?
 
       if respond_to?(:paranoia_destroy)
@@ -138,7 +141,7 @@ module Historiographer
       when 0..5 then changed? && valid?
       when 5.1..7 then saved_changes?
       else
-        raise "Unsupported Rails version"
+        raise 'Unsupported Rails version'
       end
     end
 
@@ -157,7 +160,7 @@ module Historiographer
 
     begin
       class_name.constantize
-    rescue
+    rescue StandardError
       history_class_initializer = Class.new(ActiveRecord::Base) do
       end
 
@@ -170,7 +173,7 @@ module Historiographer
       raise "#{base} already has histories. Talk to Brett if this is a legit use case."
     else
       opts = { class_name: class_name }
-      opts.merge!(foreign_key: klass.history_foreign_key) if klass.respond_to?(:history_foreign_key)
+      opts[:foreign_key] = klass.history_foreign_key if klass.respond_to?(:history_foreign_key)
       has_many :histories, opts
       has_one :current_history, -> { current }, opts
     end
@@ -187,14 +190,12 @@ module Historiographer
     module UpdateColumnsWithHistory
       def update_columns(*args)
         opts = args.extract_options!
-        any_changes = opts.keys.reject { |k| k == "id" }.any?
+        any_changes = opts.keys.reject { |k| k == 'id' }.any?
 
         transaction do
           persisted = super(opts)
 
-          if any_changes && persisted
-            record_history
-          end
+          record_history if any_changes && persisted
         end
       end
     end
@@ -216,7 +217,7 @@ module Historiographer
     private
 
     def history_user_absent_action
-      raise HistoryUserIdMissingError.new("history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_user")
+      raise HistoryUserIdMissingError, 'history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_user'
     end
 
     #
@@ -233,23 +234,22 @@ module Historiographer
       foreign_key = history_class.history_foreign_key
 
       now = UTC.now
-      attrs.merge!(foreign_key => attrs["id"], history_started_at: now, history_user_id: history_user_id)
+      attrs.merge!(foreign_key => attrs['id'], history_started_at: now, history_user_id: history_user_id)
 
-      attrs = attrs.except("id")
+      attrs = attrs.except('id')
 
-      current_history = histories.where(history_ended_at: nil).order("id desc").limit(1).last
+      current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
-      unless foreign_key.present? && history_class.present?
-        raise "Need foreign key and history class to save history!"
-      else
+      if foreign_key.present? && history_class.present?
         history_class.create!(attrs)
         current_history.update!(history_ended_at: now) if current_history.present?
+      else
+        raise 'Need foreign key and history class to save history!'
       end
     end
   end
 
   class_methods do
-
     #
     # E.g. SponsoredProductCampaign => SponsoredProductCampaignHistory
     #
