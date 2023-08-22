@@ -34,7 +34,11 @@ module Historiographer
         opts = {}
         opts.merge!(column.as_json.clone)
 
-        send(column.type, column.name, opts.symbolize_keys!)
+        if RUBY_VERSION.to_i >= 3
+          send(column.type, column.name, **opts.symbolize_keys!)
+        else
+          send(column.type, column.name, opts.symbolize_keys!)
+        end
       end
 
       datetime :history_started_at, null: false
