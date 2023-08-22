@@ -35,6 +35,7 @@ module Historiographer
         opts.merge!(column.as_json.clone)
 
         if RUBY_VERSION.to_i >= 3
+          puts "Hello"
           send(column.type, column.name, **opts.symbolize_keys!)
         else
           send(column.type, column.name, opts.symbolize_keys!)

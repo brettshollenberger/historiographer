@@ -174,8 +174,13 @@ module Historiographer
     else
       opts = { class_name: class_name }
       opts[:foreign_key] = klass.history_foreign_key if klass.respond_to?(:history_foreign_key)
-      has_many :histories, opts
-      has_one :current_history, -> { current }, opts
+      if RUBY_VERSION.to_i >= 3
+        has_many :histories, **opts
+        has_one :current_history, -> { current }, **opts
+      else
+        has_many :histories, opts
+        has_one :current_history, -> { current }, opts
+      end
     end
 
     klass.send(:include, Historiographer::History) unless klass.ancestors.include?(Historiographer::History)
