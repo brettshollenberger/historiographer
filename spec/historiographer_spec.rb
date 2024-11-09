@@ -624,5 +624,13 @@ describe Historiographer do
       expect(post_history).to respond_to(:formatted_title)
       expect(post_history.formatted_title).to eq("Title: #{post.title}")
     end
+    
+    it "does not do things histories shouldn't do" do
+      post_history.update(title: "new title")
+      expect(post_history.reload.title).to eq "Post 1"
+
+      post_history.destroy
+      expect(post_history.reload.title).to eq "Post 1"
+    end
   end
 end
