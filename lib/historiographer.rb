@@ -139,7 +139,7 @@ module Historiographer
     def historiographer_changes?
       case Rails.version.to_f
       when 0..5 then changed? && valid?
-      when 5.1..7 then saved_changes?
+      when 5.1..8 then saved_changes?
       else
         raise 'Unsupported Rails version'
       end

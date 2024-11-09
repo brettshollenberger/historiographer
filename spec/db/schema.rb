@@ -10,8 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 2022_10_18_204255) do
-
+ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -19,11 +18,11 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.integer "author_id", null: false
     t.string "full_name", null: false
     t.text "bio"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.datetime "history_started_at", precision: nil, null: false
+    t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.index ["author_id"], name: "index_author_histories_on_author_id"
     t.index ["deleted_at"], name: "index_author_histories_on_deleted_at"
@@ -35,9 +34,9 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
   create_table "authors", force: :cascade do |t|
     t.string "full_name", null: false
     t.text "bio"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["deleted_at"], name: "index_authors_on_deleted_at"
   end
 
@@ -47,12 +46,12 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.text "body", null: false
     t.integer "author_id", null: false
     t.boolean "enabled", default: false
-    t.datetime "live_at"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
+    t.datetime "live_at", precision: nil
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.datetime "history_started_at", precision: nil, null: false
+    t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.index ["author_id"], name: "index_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_post_histories_on_deleted_at"
@@ -69,10 +68,10 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.text "body", null: false
     t.integer "author_id", null: false
     t.boolean "enabled", default: false
-    t.datetime "live_at"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "live_at", precision: nil
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["deleted_at"], name: "index_posts_on_deleted_at"
     t.index ["enabled"], name: "index_posts_on_enabled"
@@ -85,12 +84,12 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.text "body", null: false
     t.integer "author_id", null: false
     t.boolean "enabled", default: false
-    t.datetime "live_at"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
+    t.datetime "live_at", precision: nil
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.datetime "history_started_at", precision: nil, null: false
+    t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.index ["author_id"], name: "index_safe_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_safe_post_histories_on_deleted_at"
@@ -107,10 +106,10 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.text "body", null: false
     t.integer "author_id", null: false
     t.boolean "enabled", default: false
-    t.datetime "live_at"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "live_at", precision: nil
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["author_id"], name: "index_safe_posts_on_author_id"
     t.index ["deleted_at"], name: "index_safe_posts_on_deleted_at"
     t.index ["enabled"], name: "index_safe_posts_on_enabled"
@@ -123,12 +122,12 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.text "body", null: false
     t.integer "author_id", null: false
     t.boolean "enabled", default: false
-    t.datetime "live_at"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
+    t.datetime "live_at", precision: nil
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
+    t.datetime "history_started_at", precision: nil, null: false
+    t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.index ["author_id"], name: "index_silent_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_silent_post_histories_on_deleted_at"
@@ -145,10 +144,10 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.text "body", null: false
     t.integer "author_id", null: false
     t.boolean "enabled", default: false
-    t.datetime "live_at"
-    t.datetime "deleted_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
+    t.datetime "live_at", precision: nil
+    t.datetime "deleted_at", precision: nil
+    t.datetime "created_at", precision: nil, null: false
+    t.datetime "updated_at", precision: nil, null: false
     t.index ["author_id"], name: "index_silent_posts_on_author_id"
     t.index ["deleted_at"], name: "index_silent_posts_on_deleted_at"
     t.index ["enabled"], name: "index_silent_posts_on_enabled"
@@ -159,8 +158,8 @@ ActiveRecord::Schema.define(version: 2022_10_18_204255) do
     t.integer "thing_with_compound_index_id", null: false
     t.string "key"
     t.string "value"
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
+    t.datetime "history_started_at", precision: nil, null: false
+    t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.index ["history_ended_at"], name: "index_thing_with_compound_index_histories_on_history_ended_at"
     t.index ["history_started_at"], name: "index_thing_with_compound_index_histories_on_history_started_at"
