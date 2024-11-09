@@ -151,17 +151,35 @@ module Historiographer
     # then record history after successful save.
     #
     def should_record_history?
+      return false if is_history_class?
+
       historiographer_changes? && !@no_history
     end
 
-    attr_accessor :history_user_id
+    def history_user_id=(value)
+      if is_history_class?
+        write_attribute(:history_user_id, value)
+      else
+        @history_user_id = value
+      end
+    end
+
+    def history_user_id
+      if is_history_class?
+        read_attribute(:history_user_id)
+      else
+        @history_user_id
+      end
+    end
 
     class_name = "#{base.name}History"
 
     begin
       class_name.constantize
     rescue StandardError
-      history_class_initializer = Class.new(ActiveRecord::Base) do
+      history_class_initializer = Class.new(base) do
+        self.table_name = "#{base.table_name}_histories"
+        self.inheritance_column = nil
       end
 
       Object.const_set(class_name, history_class_initializer)
@@ -255,15 +273,26 @@ module Historiographer
   end
 
   class_methods do
+    def is_history_class?
+      name.match?(/History$/)
+    end
     #
     # E.g. SponsoredProductCampaign => SponsoredProductCampaignHistory
     #
     def history_class
-      "#{name}History".constantize
+      if is_history_class?
+        nil
+      else
+        "#{name}History".constantize
+      end
     end
 
     def relation
       super.tap { |r| r.extend Historiographer::Relation }
     end
+  end
+
+  def is_history_class?
+    self.class.is_history_class?
   end
 end

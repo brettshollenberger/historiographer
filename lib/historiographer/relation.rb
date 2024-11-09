@@ -11,7 +11,7 @@ module Historiographer
     end
 
     def update_all(updates, histories=true)
-      unless histories
+      if !histories || self.model.is_history_class?
         super(updates)
       else
         updates.symbolize_keys!

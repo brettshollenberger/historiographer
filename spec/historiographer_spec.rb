@@ -14,9 +14,18 @@ end
 class Post < ActiveRecord::Base
   include Historiographer
   acts_as_paranoid
+
+  def summary
+    "This is a summary of the post."
+  end
+
+  def formatted_title
+    "Title: #{title}"
+  end
 end
 
-class PostHistory < ActiveRecord::Base
+class PostHistory < Post
+  self.table_name = "post_histories"
 end
 
 class SafePost < ActiveRecord::Base
@@ -24,7 +33,8 @@ class SafePost < ActiveRecord::Base
   acts_as_paranoid
 end
 
-class SafePostHistory < ActiveRecord::Base
+class SafePostHistory < SafePost
+  self.table_name = "safe_post_histories"
 end
 
 class SilentPost < ActiveRecord::Base
@@ -32,14 +42,16 @@ class SilentPost < ActiveRecord::Base
   acts_as_paranoid
 end
 
-class SilentPostHistory < ActiveRecord::Base
+class SilentPostHistory < SilentPost
+  self.table_name = "silent_post_histories"
 end
 
 class Author < ActiveRecord::Base
   include Historiographer
 end
 
-class AuthorHistory < ActiveRecord::Base
+class AuthorHistory < Author
+  self.table_name = "author_histories"
 end
 
 class User < ActiveRecord::Base
@@ -49,7 +61,8 @@ class ThingWithCompoundIndex < ActiveRecord::Base
   include Historiographer
 end
 
-class ThingWithCompoundIndexHistory < ActiveRecord::Base
+class ThingWithCompoundIndexHistory < ThingWithCompoundIndex
+  self.table_name = "thing_with_compound_index_histories"
 end
 
 class ThingWithoutHistory < ActiveRecord::Base
@@ -252,12 +265,12 @@ describe Historiographer do
           Timecop.freeze
           posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
           Post.delete_all(history_user_id: 1)
-          expect(PostHistory.count).to eq 6
-          expect(PostHistory.current.count).to eq 3
-          expect(PostHistory.current.map(&:deleted_at)).to all(eq Time.now)
-          expect(PostHistory.current.map(&:history_user_id)).to all(eq 1)
-          expect(PostHistory.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
-          expect(PostHistory.where(history_ended_at: nil).count).to eq 3
+          expect(PostHistory.unscoped.count).to eq 6
+          expect(PostHistory.unscoped.current.count).to eq 3
+          expect(PostHistory.unscoped.current.map(&:deleted_at)).to all(eq Time.now)
+          expect(PostHistory.unscoped.current.map(&:history_user_id)).to all(eq 1)
+          expect(PostHistory.unscoped.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
+          expect(PostHistory.unscoped.where(history_ended_at: nil).count).to eq 3
           expect(Post.count).to eq 0
           Timecop.return
         end
@@ -277,12 +290,12 @@ describe Historiographer do
           Timecop.freeze
           posts = FactoryBot.create_list(:post, 3, history_user_id: 1)
           Post.destroy_all(history_user_id: 1)
-          expect(PostHistory.count).to eq 6
-          expect(PostHistory.current.count).to eq 3
-          expect(PostHistory.current.map(&:deleted_at)).to all(eq Time.now)
-          expect(PostHistory.current.map(&:history_user_id)).to all(eq 1)
-          expect(PostHistory.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
-          expect(PostHistory.where(history_ended_at: nil).count).to eq 3
+          expect(PostHistory.unscoped.count).to eq 6
+          expect(PostHistory.unscoped.current.count).to eq 3
+          expect(PostHistory.unscoped.current.map(&:deleted_at)).to all(eq Time.now)
+          expect(PostHistory.unscoped.current.map(&:history_user_id)).to all(eq 1)
+          expect(PostHistory.unscoped.where(deleted_at: nil).where.not(history_ended_at: nil).count).to eq 3
+          expect(PostHistory.unscoped.where(history_ended_at: nil).count).to eq 3
           expect(Post.count).to eq 0
           Timecop.return
         end
@@ -501,13 +514,13 @@ describe Historiographer do
       expect do
         post.destroy(history_user_id: 2)
       end.to change {
-        PostHistory.count
+        PostHistory.unscoped.count
       }.by 1
 
       expect(Post.unscoped.where.not(deleted_at: nil).count).to eq 1
       expect(Post.unscoped.where(deleted_at: nil).count).to eq 0
-      expect(PostHistory.where.not(deleted_at: nil).count).to eq 1
-      expect(PostHistory.last.history_user_id).to eq 2
+      expect(PostHistory.unscoped.where.not(deleted_at: nil).count).to eq 1
+      expect(PostHistory.unscoped.last.history_user_id).to eq 2
     end
 
     it 'works with Historiographer::Safe' do
@@ -517,10 +530,10 @@ describe Historiographer do
         post.destroy
       end.to_not raise_error
 
-      expect(SafePost.count).to eq 0
+      expect(SafePost.unscoped.count).to eq 1
       expect(post.deleted_at).to_not be_nil
-      expect(SafePostHistory.count).to eq 2
-      expect(SafePostHistory.current.last.deleted_at).to eq post.deleted_at
+      expect(SafePostHistory.unscoped.count).to eq 2
+      expect(SafePostHistory.unscoped.current.last.deleted_at).to eq post.deleted_at
 
       post2 = SafePost.create(title: 'HELLO', body: 'YO', author_id: 1)
 
@@ -530,8 +543,8 @@ describe Historiographer do
 
       expect(SafePost.count).to eq 0
       expect(post2.deleted_at).to_not be_nil
-      expect(SafePostHistory.count).to eq 4
-      expect(SafePostHistory.current.where(safe_post_id: post2.id).last.deleted_at).to eq post2.deleted_at
+      expect(SafePostHistory.unscoped.count).to eq 4
+      expect(SafePostHistory.unscoped.current.where(safe_post_id: post2.id).last.deleted_at).to eq post2.deleted_at
     end
   end
 
@@ -590,6 +603,26 @@ describe Historiographer do
       expect(indexes).to include(['id'])
       expect(indexes).to include(%w[key value])
       expect(indexes).to include(['thing_with_compound_index_id'])
+    end
+  end
+
+  describe 'Reified Histories' do
+    let(:post) { create_post }
+    let(:post_history) { post.histories.first }
+
+    it 'responds to methods defined on the original class' do
+      expect(post_history).to respond_to(:summary)
+      expect(post_history.summary).to eq('This is a summary of the post.')
+    end
+
+    it 'behaves like the original class for attribute methods' do
+      expect(post_history.title).to eq(post.title)
+      expect(post_history.body).to eq(post.body)
+    end
+
+    it 'supports custom instance methods' do
+      expect(post_history).to respond_to(:formatted_title)
+      expect(post_history.formatted_title).to eq("Title: #{post.title}")
     end
   end
 end
