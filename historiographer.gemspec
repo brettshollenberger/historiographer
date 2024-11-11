@@ -18,48 +18,7 @@ Gem::Specification.new do |s|
     "LICENSE.txt",
     "README.md"
   ]
-  s.files = [
-    ".document",
-    ".rspec",
-    ".ruby-version",
-    ".standalone_migrations",
-    "Gemfile",
-    "Gemfile.lock",
-    "Guardfile",
-    "LICENSE.txt",
-    "README.md",
-    "Rakefile",
-    "VERSION",
-    "historiographer.gemspec",
-    "init.rb",
-    "lib/historiographer.rb",
-    "lib/historiographer/history.rb",
-    "lib/historiographer/history_migration.rb",
-    "lib/historiographer/history_migration_mysql.rb",
-    "lib/historiographer/mysql_migration.rb",
-    "lib/historiographer/postgres_migration.rb",
-    "lib/historiographer/relation.rb",
-    "lib/historiographer/safe.rb",
-    "lib/historiographer/silent.rb",
-    "spec/db/database.yml",
-    "spec/db/migrate/20161121212228_create_posts.rb",
-    "spec/db/migrate/20161121212229_create_post_histories.rb",
-    "spec/db/migrate/20161121212230_create_authors.rb",
-    "spec/db/migrate/20161121212231_create_author_histories.rb",
-    "spec/db/migrate/20161121212232_create_users.rb",
-    "spec/db/migrate/20171011194624_create_safe_posts.rb",
-    "spec/db/migrate/20171011194715_create_safe_post_histories.rb",
-    "spec/db/migrate/20191024142304_create_thing_with_compound_index.rb",
-    "spec/db/migrate/20191024142352_create_thing_with_compound_index_history.rb",
-    "spec/db/migrate/20191024203106_create_thing_without_history.rb",
-    "spec/db/migrate/20221018204220_create_silent_posts.rb",
-    "spec/db/migrate/20221018204255_create_silent_post_histories.rb",
-    "spec/db/schema.rb",
-    "spec/examples.txt",
-    "spec/factories/post.rb",
-    "spec/historiographer_spec.rb",
-    "spec/spec_helper.rb"
-  ]
+  s.files = Dir[File.expand_path("**/*")]
   s.homepage = "http://github.com/brettshollenberger/historiographer".freeze
   s.licenses = ["MIT".freeze]
   s.rubygems_version = "3.2.22".freeze

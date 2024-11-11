@@ -139,7 +139,7 @@ module Historiographer
       # If the record was not already persisted, proceed as normal.
       #
       def save(*args)
-        if persisted? && (changes.keys - %w(history_ended_at)).any?
+        if persisted? && (changes.keys - %w(history_ended_at snapshot_id)).any?
           false
         else
           super
@@ -147,12 +147,18 @@ module Historiographer
       end
 
       def save!(*args)
-        if persisted? && (changes.keys - %w(history_ended_at)).any?
+        if persisted? && (changes.keys - %w(history_ended_at snapshot_id)).any?
           false
         else
           super
         end
       end
+
+      # Returns the most recent snapshot based on history_started_at
+      scope :latest_snapshot, -> { 
+        select('DISTINCT ON (snapshot_id) *')
+          .order('snapshot_id, history_started_at DESC').limit(1)&.first
+      }
     end
 
     class_methods do

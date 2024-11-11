@@ -14,6 +14,7 @@ end
 class Post < ActiveRecord::Base
   include Historiographer
   acts_as_paranoid
+  has_many :comments
 
   def summary
     "This is a summary of the post."
@@ -26,6 +27,16 @@ end
 
 class PostHistory < Post
   self.table_name = "post_histories"
+end
+
+class Comment < ActiveRecord::Base
+  include Historiographer
+  belongs_to :post
+  belongs_to :author
+end
+
+class CommentHistory < Comment
+  self.table_name = "comment_histories"
 end
 
 class SafePost < ActiveRecord::Base
@@ -48,6 +59,8 @@ end
 
 class Author < ActiveRecord::Base
   include Historiographer
+  has_many :comments
+  has_many :posts
 end
 
 class AuthorHistory < Author
@@ -66,6 +79,16 @@ class ThingWithCompoundIndexHistory < ThingWithCompoundIndex
 end
 
 class ThingWithoutHistory < ActiveRecord::Base
+end
+
+class Comment < ActiveRecord::Base
+  include Historiographer
+  belongs_to :post
+  belongs_to :author
+end
+
+class CommentHistory < Comment
+  self.table_name = "comment_histories"
 end
 
 describe Historiographer do
@@ -99,6 +122,10 @@ describe Historiographer do
     )
   end
 
+  before(:each) do
+    Historiographer::Configuration.mode = :histories
+  end
+
   describe 'History counting' do
     it 'creates history on creation of primary model record' do
       expect do
@@ -110,7 +137,6 @@ describe Historiographer do
 
     it 'appends new history on update' do
       post = create_post
-
       expect do
         post.update(title: 'Better Title')
       end.to change {
@@ -130,6 +156,7 @@ describe Historiographer do
   end
 
   describe 'History recording' do
+
     it 'records all fields from the parent' do
       post         = create_post
       post_history = post.histories.first
@@ -138,7 +165,7 @@ describe Historiographer do
       expect(post_history.body).to eq      post.body
       expect(post_history.author_id).to eq post.author_id
       expect(post_history.post_id).to eq   post.id
-      expect(post_history.history_started_at.to_s).to eq @now.in_time_zone(Historiographer::UTC).to_s
+      expect(post_history.history_started_at).to be_within(1.second).of(@now.in_time_zone(Historiographer::UTC))
       expect(post_history.history_ended_at).to be_nil
       expect(post_history.history_user_id).to eq user.id
 
@@ -147,7 +174,7 @@ describe Historiographer do
       first_history  = post_histories.first
       second_history = post_histories.second
 
-      expect(first_history.history_ended_at.to_s).to eq @now.in_time_zone(Historiographer::UTC).to_s
+      expect(first_history.history_ended_at).to be_within(1.second).of(@now.in_time_zone(Historiographer::UTC))
       expect(second_history.history_ended_at).to be_nil
     end
 
@@ -609,6 +636,8 @@ describe Historiographer do
   describe 'Reified Histories' do
     let(:post) { create_post }
     let(:post_history) { post.histories.first }
+    let(:author) { Author.create(full_name: 'Commenter Jones', history_user_id: user.id) }
+    let(:comment) { Comment.create(post: post, author: author, history_user_id: user.id) }
 
     it 'responds to methods defined on the original class' do
       expect(post_history).to respond_to(:summary)
@@ -632,5 +661,109 @@ describe Historiographer do
       post_history.destroy
       expect(post_history.reload.title).to eq "Post 1"
     end
+
+  end
+
+  describe 'Snapshots' do
+    let(:post) { create_post }
+    let(:author) { Author.create(full_name: 'Commenter Jones', history_user_id: user.id) }
+    let(:comment) { Comment.create(body: "Mean comment! I hate you!", post: post, author: author, history_user_id: user.id) }
+
+    it 'creates a snapshot of the post and its associations' do
+      # Take a snapshot
+      comment # Make sure all records are created
+      post.snapshot
+
+      # Verify snapshot
+      snapshot_post = PostHistory.where.not(snapshot_id: nil).last
+      expect(snapshot_post.title).to eq post.title
+      expect(snapshot_post.formatted_title).to eq post.formatted_title
+
+      snapshot_comment = snapshot_post.comments.first
+      expect(snapshot_comment.body).to eq comment.body
+      expect(snapshot_comment.post_id).to eq post.id
+      expect(snapshot_comment.class.name).to eq "CommentHistory"
+
+      snapshot_author = snapshot_comment.author
+      expect(snapshot_author.full_name).to eq author.full_name
+      expect(snapshot_author.class.name).to eq "AuthorHistory"
+
+      # Snapshots do not allow change
+      expect(snapshot_post.update(title: "My title")).to eq false
+      expect(snapshot_post.reload.title).to eq post.title
+    end
+
+    it "returns the latest snapshot" do
+      Timecop.freeze(Time.now)
+      # Take a snapshot
+      comment # Make sure all records are created
+      post.snapshot(history_user_id: user.id)
+      comment.destroy(history_user_id: user.id)
+      post.comments.create!(post: post, author: author, history_user_id: user.id, body: "Sorry man, didn't mean to post that")
+
+      expect(PostHistory.count).to eq 1
+      expect(CommentHistory.count).to eq 2
+      expect(AuthorHistory.count).to eq 1
+
+      Timecop.freeze(Time.now + 5.minutes)
+      post.snapshot(history_user_id: user.id)
+
+      expect(PostHistory.count).to eq 2
+      expect(CommentHistory.count).to eq 2
+      expect(AuthorHistory.count).to eq 2
+
+      # Verify snapshot
+      snapshot_post = Post.latest_snapshot
+      expect(snapshot_post.title).to eq post.title
+      expect(snapshot_post.formatted_title).to eq post.formatted_title
+
+      snapshot_comment = snapshot_post.comments.first
+      expect(snapshot_post.comments.count).to eq 1
+      expect(snapshot_comment.body).to eq "Sorry man, didn't mean to post that"
+      expect(snapshot_comment.post_id).to eq post.id
+      expect(snapshot_comment.class.name).to eq "CommentHistory"
+
+      snapshot_author = snapshot_comment.author
+      expect(snapshot_author.full_name).to eq author.full_name
+      expect(snapshot_author.class.name).to eq "AuthorHistory"
+
+      # Snapshots do not allow change
+      expect(snapshot_post.update(title: "My title")).to eq false
+      expect(snapshot_post.reload.title).to eq post.title
+      
+      Timecop.return
+    end
+
+    it "uses snapshot_only mode" do
+      Historiographer::Configuration.mode = :snapshot_only
+
+      comment # Make sure all records are created
+      post
+      expect(PostHistory.count).to eq 0
+      expect(CommentHistory.count).to eq 0
+      expect(AuthorHistory.count).to eq 0
+
+      post.snapshot
+      expect(PostHistory.count).to eq 1
+      expect(CommentHistory.count).to eq 1
+      expect(AuthorHistory.count).to eq 1
+
+      comment.destroy(history_user_id: user.id)
+      post.comments.create!(post: post, author: author, history_user_id: user.id, body: "Sorry man, didn't mean to post that")
+
+      expect(PostHistory.count).to eq 1
+      expect(CommentHistory.count).to eq 1
+      expect(AuthorHistory.count).to eq 1
+
+      Timecop.freeze(Time.now + 5.minutes)
+      post.snapshot
+
+      expect(PostHistory.count).to eq 2
+      expect(CommentHistory.count).to eq 2
+      expect(AuthorHistory.count).to eq 2
+
+      Timecop.return
+    end
+
   end
 end

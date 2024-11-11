@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
+ActiveRecord::Schema[7.1].define(version: 2024_11_09_182020) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -24,11 +24,13 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.datetime "history_started_at", precision: nil, null: false
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
+    t.string "snapshot_id"
     t.index ["author_id"], name: "index_author_histories_on_author_id"
     t.index ["deleted_at"], name: "index_author_histories_on_deleted_at"
     t.index ["history_ended_at"], name: "index_author_histories_on_history_ended_at"
     t.index ["history_started_at"], name: "index_author_histories_on_history_started_at"
     t.index ["history_user_id"], name: "index_author_histories_on_history_user_id"
+    t.index ["snapshot_id"], name: "index_author_histories_on_snapshot_id"
   end
 
   create_table "authors", force: :cascade do |t|
@@ -38,6 +40,36 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.index ["deleted_at"], name: "index_authors_on_deleted_at"
+  end
+
+  create_table "comment_histories", force: :cascade do |t|
+    t.integer "comment_id", null: false
+    t.integer "post_id"
+    t.integer "author_id"
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["author_id"], name: "index_comment_histories_on_author_id"
+    t.index ["comment_id"], name: "index_comment_histories_on_comment_id"
+    t.index ["history_ended_at"], name: "index_comment_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_comment_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_comment_histories_on_history_user_id"
+    t.index ["post_id"], name: "index_comment_histories_on_post_id"
+    t.index ["snapshot_id"], name: "index_comment_histories_on_snapshot_id"
+  end
+
+  create_table "comments", force: :cascade do |t|
+    t.bigint "post_id"
+    t.bigint "author_id"
+    t.text "body"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_comments_on_author_id"
+    t.index ["post_id"], name: "index_comments_on_post_id"
   end
 
   create_table "post_histories", force: :cascade do |t|
@@ -53,6 +85,7 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.datetime "history_started_at", precision: nil, null: false
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
+    t.string "snapshot_id"
     t.index ["author_id"], name: "index_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_post_histories_on_deleted_at"
     t.index ["enabled"], name: "index_post_histories_on_enabled"
@@ -61,6 +94,7 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.index ["history_user_id"], name: "index_post_histories_on_history_user_id"
     t.index ["live_at"], name: "index_post_histories_on_live_at"
     t.index ["post_id"], name: "index_post_histories_on_post_id"
+    t.index ["snapshot_id"], name: "index_post_histories_on_snapshot_id"
   end
 
   create_table "posts", force: :cascade do |t|
@@ -91,6 +125,7 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.datetime "history_started_at", precision: nil, null: false
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
+    t.string "snapshot_id"
     t.index ["author_id"], name: "index_safe_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_safe_post_histories_on_deleted_at"
     t.index ["enabled"], name: "index_safe_post_histories_on_enabled"
@@ -99,6 +134,7 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.index ["history_user_id"], name: "index_safe_post_histories_on_history_user_id"
     t.index ["live_at"], name: "index_safe_post_histories_on_live_at"
     t.index ["safe_post_id"], name: "index_safe_post_histories_on_safe_post_id"
+    t.index ["snapshot_id"], name: "index_safe_post_histories_on_snapshot_id"
   end
 
   create_table "safe_posts", force: :cascade do |t|
@@ -129,6 +165,7 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.datetime "history_started_at", precision: nil, null: false
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
+    t.string "snapshot_id"
     t.index ["author_id"], name: "index_silent_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_silent_post_histories_on_deleted_at"
     t.index ["enabled"], name: "index_silent_post_histories_on_enabled"
@@ -137,6 +174,7 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.index ["history_user_id"], name: "index_silent_post_histories_on_history_user_id"
     t.index ["live_at"], name: "index_silent_post_histories_on_live_at"
     t.index ["silent_post_id"], name: "index_silent_post_histories_on_silent_post_id"
+    t.index ["snapshot_id"], name: "index_silent_post_histories_on_snapshot_id"
   end
 
   create_table "silent_posts", force: :cascade do |t|
@@ -161,10 +199,12 @@ ActiveRecord::Schema[7.1].define(version: 2022_10_18_204255) do
     t.datetime "history_started_at", precision: nil, null: false
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
+    t.string "snapshot_id"
     t.index ["history_ended_at"], name: "index_thing_with_compound_index_histories_on_history_ended_at"
     t.index ["history_started_at"], name: "index_thing_with_compound_index_histories_on_history_started_at"
     t.index ["history_user_id"], name: "index_thing_with_compound_index_histories_on_history_user_id"
     t.index ["key", "value"], name: "idx_history_k_v"
+    t.index ["snapshot_id"], name: "index_thing_with_compound_index_histories_on_snapshot_id"
     t.index ["thing_with_compound_index_id"], name: "idx_k_v_histories"
   end
 

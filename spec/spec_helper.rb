@@ -1,4 +1,5 @@
-ENV["HISTORIOGRAPHY_ENV"] = "test"
+ENV["HISTORIOGRAPHER_ENV"] = "test"
+ENV["RAILS_ENV"] = "test"
 
 require_relative "../init.rb"
 require "ostruct"
@@ -37,8 +38,11 @@ RSpec.configure do |config|
     ActiveRecord::Migration.maintain_test_schema!
   end
 
-  config.before(:each) do |example|
+  config.around(:each) do |example|
     DatabaseCleaner.strategy = :transaction
+    DatabaseCleaner.start
+    example.run
+    DatabaseCleaner.clean
     DatabaseCleaner.clean_with(:truncation)
   end
 
