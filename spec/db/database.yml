@@ -1,12 +1,14 @@
 development:
   adapter: postgresql
-  prepared_statements: false
-  url: "postgres://localhost/historiographer_development"
+  encoding: unicode
+  database: historiographer_development
+  pool: 5
 
 test:
   adapter: postgresql
+  encoding: unicode
   database: historiographer_test
-  url: "postgres://localhost/historiographer_test"
+  pool: 5
 
 # mysql_default: &mysql_default
 #   adapter: mysql2

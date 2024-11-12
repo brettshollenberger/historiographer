@@ -29,22 +29,24 @@ module Historiographer
       original_columns = klass.columns.reject { |c| c.name == "id" || except.include?(c.name) || (only.any? && only.exclude?(c.name)) || no_business_columns }
 
       integer foreign_key.to_sym, null: false
+      valid_keys = [:limit, :precision, :scale, :default, :null, :collation, :comment, 
+                    :primary_key, :if_exists, :if_not_exists, :array, :using, 
+                    :cast_as, :as, :type, :enum_type, :stored]
 
       original_columns.each do |column|
-        opts = {}
-        opts.merge!(column.as_json.clone)
+        opts = column.as_json.symbolize_keys.slice(*valid_keys) # Only keep valid keys
 
         if RUBY_VERSION.to_i >= 3
-          puts "Hello"
-          send(column.type, column.name, **opts.symbolize_keys!)
+          send(column.type, column.name, **opts)
         else
-          send(column.type, column.name, opts.symbolize_keys!)
+          send(column.type, column.name, opts)
         end
       end
 
       datetime :history_started_at, null: false
       datetime :history_ended_at
       integer :history_user_id
+      string :snapshot_id
 
       indices_sql = %q(
         SELECT 
@@ -75,7 +77,8 @@ module Historiographer
         foreign_key,
         :history_started_at,
         :history_ended_at,
-        :history_user_id
+        :history_user_id,
+        :snapshot_id
       ])
 
       indexes.each do |index_definition|
