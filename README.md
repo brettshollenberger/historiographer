@@ -8,21 +8,11 @@ Historiographer fixes this problem in a better way than existing auditing gems.
 
 The Audited gem has some serious flaws.
 
-🤚Hands up if your `versions` table has gotten too big to query 🤚
+1. The `versions` table quickly grows too large to query
 
-🤚Hands up if your `versions` table doesn't have the indexes you need 🤚
+2. It doesn't provide the indexes you need from your primary tables
 
-🤚Hands up if you've ever iterated over `versions` records in Ruby to recreate a snapshot of what data looked like at a point in time. 🤚
-
-Why does this happen?
-
-First, `audited` only tracks a record of what changed, so there's no way to "go back in time" and see what the data looked like back when a problem occurred without replaying every single audit.
-
-Second, it tracks changes as JSON. While some data stores have JSON querying semantics, not all do, making it very hard to ask complex questions of your historical data -- that's the whole reason you're keeping it around.
-
-Third, it doesn't maintain indexes on your data. If you maintain an index on the primary table, wouldn't you also want to look up historical records using the same columns? Historical data is MUCH larger than "latest snapshot" data, so, duh, of course you do.
-
-Finally, Audited creates just one table for all audits. Historical data is big. It's not unusual for an audited gem table to get into the many millions of rows, and need to be constantly partitioned to maintain any kind of efficiency.
+3. It doesn't provdie out-of-the-box snapshots
 
 ## How does Historiographer solve these problems?
 
@@ -150,18 +140,33 @@ class Post < ActiveRecord::Base
 end
 ```
 
-By default, Historiographer will require all SQL-backed methods to provide a `history_user_id` to track who made the changes.
+### History Modes
+
+Historiographer supports two modes of operation:
+
+1. **:histories mode** (default) - Records history for every change to a record
+2. **:snapshot_only mode** - Only records history when explicitly taking snapshots
+
+You can configure the mode globally:
 
 ```ruby
-Post.create(title: "My Post", history_user_id: current_user.id) # => OK
-Post.create(title: "My Post") # => Error!
+# In an initializer
+Historiographer::Configuration.mode = :histories  # Default mode
+# or
+Historiographer::Configuration.mode = :snapshot_only
 ```
 
-Many existing models will be better off using `Historiographer::Safe` when getting started, which will not raise an error, but will alert you of locations where your app is missing `history_user_id`.
+Or per model using `historiographer_mode`:
 
 ```ruby
 class Post < ActiveRecord::Base
-  include Historiographer::Safe
+  include Historiographer
+  historiographer_mode :snapshot_only  # Only record history when .snapshot is called
+end
+
+class Comment < ActiveRecord::Base
+  include Historiographer
+  historiographer_mode :histories  # Record history for every change (default)
 end
 ```
 

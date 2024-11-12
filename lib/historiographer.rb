@@ -414,17 +414,21 @@ module Historiographer
     def relation
       super.tap { |r| r.extend Historiographer::Relation }
     end
+
+    def historiographer_mode(mode)
+      @historiographer_mode = mode
+    end
+
+    def get_historiographer_mode
+      @historiographer_mode || Historiographer::Configuration.mode
+    end
   end
 
   def is_history_class?
     self.class.is_history_class?
   end
 
-  def mode
-    @mode ||= Historiographer::Configuration.mode
-  end
-
   def snapshot_mode?
-    @snapshot_mode ||= (mode.to_sym == :snapshot_only)
+    (self.class.get_historiographer_mode.to_sym == :snapshot_only)
   end
 end

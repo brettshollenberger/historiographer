@@ -92,8 +92,15 @@ class CommentHistory < Comment
 end
 
 describe Historiographer do
-  before(:all) do
+  before(:each) do
     @now = Timecop.freeze
+  end
+  after(:each) do
+    Timecop.return
+  end
+
+  before(:all) do
+    Historiographer::Configuration.mode = :histories
   end
 
   after(:all) do
@@ -761,9 +768,46 @@ describe Historiographer do
       expect(PostHistory.count).to eq 2
       expect(CommentHistory.count).to eq 2
       expect(AuthorHistory.count).to eq 2
-
-      Timecop.return
     end
 
+  end
+
+  describe 'Class-level mode setting' do
+    before(:each) do
+      Historiographer::Configuration.mode = :histories
+    end
+
+    it "uses class-level snapshot_only mode" do
+      class Post < ActiveRecord::Base
+        historiographer_mode :snapshot_only
+      end
+
+      author = Author.create(full_name: 'Commenter Jones', history_user_id: user.id) 
+      post = Post.create(title: 'Snapshot Only Post', body: 'Test', author_id: 1, history_user_id: user.id)
+      comment = Comment.create(post: post, author: author, history_user_id: user.id, body: "Initial comment")
+      
+      expect(PostHistory.count).to eq 0
+      expect(CommentHistory.count).to eq 1  # Comment still uses default :histories mode
+
+      post.snapshot
+      expect(PostHistory.count).to eq 1
+      expect(CommentHistory.count).to eq 1
+
+      post.update(title: 'Updated Snapshot Only Post', history_user_id: user.id)
+      expect(PostHistory.count).to eq 1  # No new history created for update
+      expect(CommentHistory.count).to eq 1
+
+      Timecop.freeze(Time.now + 5.minutes)
+      post.snapshot
+
+      expect(PostHistory.count).to eq 2
+      expect(CommentHistory.count).to eq 2  # Comment creates a new history
+
+      Timecop.return
+
+      class Post < ActiveRecord::Base
+        historiographer_mode nil
+      end
+    end
   end
 end

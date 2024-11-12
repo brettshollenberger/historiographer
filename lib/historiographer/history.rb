@@ -154,10 +154,11 @@ module Historiographer
         end
       end
 
-      # Returns the most recent snapshot based on history_started_at
-      scope :latest_snapshot, -> { 
-        select('DISTINCT ON (snapshot_id) *')
-          .order('snapshot_id, history_started_at DESC').limit(1)&.first
+      # Returns the most recent snapshot for each snapshot_id
+      # Orders by history_started_at and id to handle cases where multiple records
+      # have the same history_started_at timestamp
+      scope :latest_snapshot, -> {
+        where.not(snapshot_id: nil).order('id DESC').limit(1)&.first
       }
     end
 

@@ -28,5 +28,9 @@ module Historiographer
         end
       end
     end
+
+    def initialize
+      @mode = :histories
+    end
   end
 end
