@@ -6,7 +6,7 @@
 
 Gem::Specification.new do |s|
   s.name = "historiographer".freeze
-  s.version = "4.1.0"
+  s.version = "4.1.1"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
@@ -18,7 +18,7 @@ Gem::Specification.new do |s|
     "LICENSE.txt",
     "README.md"
   ]
-  s.files = Dir[File.expand_path("**/*")]
+  s.files = Dir.glob("{lib}/**/*", File::FNM_DOTMATCH).reject { |f| File.directory?(f) }
   s.homepage = "http://github.com/brettshollenberger/historiographer".freeze
   s.licenses = ["MIT".freeze]
   s.rubygems_version = "3.2.22".freeze
