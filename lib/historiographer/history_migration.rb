@@ -26,6 +26,7 @@ module Historiographer
 
       class_name = original_table_name.classify
       klass      = Object.const_set(class_name, class_definer)
+      klass.send("table_name=", original_table_name)
       original_columns = klass.columns.reject { |c| c.name == "id" || except.include?(c.name) || (only.any? && only.exclude?(c.name)) || no_business_columns }
 
       integer foreign_key.to_sym, null: false
