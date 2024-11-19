@@ -31,14 +31,17 @@ class PostHistory < Post
 end
 
 class PrivatePost < Post
-end
-
-class PrivatePostHistory < PostHistory
-  self.table_name = "post_histories"
+  self.table_name = "posts"
+  include Historiographer
 
   def title
     "Private — You cannot see!"
   end
+end
+
+class PrivatePostHistory < PrivatePost
+  self.table_name = "post_histories"
+  include Historiographer::History
 end
 
 class Comment < ActiveRecord::Base
@@ -104,23 +107,43 @@ class CommentHistory < Comment
 end
 
 class MLModel < ActiveRecord::Base
-  include Historiographer
+  self.table_name = "ml_models"
   self.inheritance_column = :model_type
+  include Historiographer
+
+  has_one :dataset
 end
 
 class MLModelHistory < MLModel
   self.inheritance_column = :model_type
   self.table_name = "ml_model_histories"
+  include Historiographer::History
 end
 
 class XGBoost < MLModel
+  self.inheritance_column = :model_type
   self.table_name = "ml_models"
+  include Historiographer
 end
 
-class XGBoostHistory < MLModelHistory
+class XGBoostHistory < XGBoost
   self.inheritance_column = :model_type
   self.table_name = "ml_model_histories"
+  include Historiographer::History
 end
+
+class Dataset < ActiveRecord::Base
+  include Historiographer
+  self.table_name = "datasets"
+
+  belongs_to :ml_model, class_name: "MLModel"
+end
+
+class DatasetHistory < Dataset
+  self.table_name = "dataset_histories"
+  include Historiographer::History
+end
+
 
 describe Historiographer do
   before(:each) do
@@ -825,14 +848,14 @@ describe Historiographer do
       private_post.snapshot
 
       # Verify history record
-      post_history = PostHistory.last
+      post_history = private_post.current_history
       expect(post_history).to be_a(PrivatePostHistory)
       expect(post_history.type).to eq('PrivatePostHistory')
       expect(post_history.post_id).to eq(private_post.id)
 
       # Update and create another history
       private_post.update(title: 'Updated Private Post', history_user_id: user.id)
-      new_history = PostHistory.last
+      new_history = private_post.current_history
       expect(new_history).to be_a(PrivatePostHistory)
       expect(new_history.type).to eq('PrivatePostHistory')
     end
@@ -867,6 +890,23 @@ describe Historiographer do
     end
   end
 
+  describe 'Single Table Inheritance with Associations' do
+    let(:user) { User.create(name: 'Test User') }
+
+    it 'inherits associations in history classes' do
+      dataset = Dataset.create(name: "test_dataset", history_user_id: user.id)
+      model = XGBoost.create(name: "test_model", dataset: dataset, history_user_id: user.id)
+      
+      expect(dataset.ml_model).to eq model # This is still a live model
+      expect(model.dataset).to eq(dataset)
+      expect(model.histories.first).to respond_to(:dataset)
+      expect(model.histories.first.dataset).to eq(dataset)
+
+      model_history = model.current_history
+      expect(model_history.dataset.ml_model).to eq model_history # These refer back and forth
+    end
+  end
+
   describe 'Single Table Inheritance with custom inheritance column' do
     let(:user) { User.create(name: 'Test User') }
     let(:xgboost) do
@@ -898,7 +938,7 @@ describe Historiographer do
       model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
       model.snapshot
       
-      reified = MLModel.latest_snapshot
+      reified = model.latest_snapshot
       expect(reified).to be_a(XGBoostHistory)
       expect(reified.name).to eq("Updated XGBoost Model")
     end
