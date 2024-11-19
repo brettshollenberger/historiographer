@@ -85,10 +85,6 @@ module Historiographer
     after_save :record_history, if: :should_record_history?
     validate :validate_history_user_id_present, if: :should_validate_history_user_id_present?
 
-    # Add scope to fetch latest histories
-    scope :latest_snapshot, -> {
-      history_class.latest_snapshot
-    }
 
     def should_alert_history_user_id_present?
       !snapshot_mode? && !is_history_class? && Thread.current[:skip_history_user_id_validation] != true
@@ -413,6 +409,11 @@ module Historiographer
   end
 
   class_methods do
+    def latest_snapshot
+      instance = history_class.latest_snapshot
+      instance.is_a?(history_class) ? instance : nil
+    end
+
     def is_history_class?
       name.match?(/History$/)
     end

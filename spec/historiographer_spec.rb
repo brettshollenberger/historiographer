@@ -103,6 +103,25 @@ class CommentHistory < Comment
   self.table_name = "comment_histories"
 end
 
+class MLModel < ActiveRecord::Base
+  include Historiographer
+  self.inheritance_column = :model_type
+end
+
+class MLModelHistory < MLModel
+  self.inheritance_column = :model_type
+  self.table_name = "ml_model_histories"
+end
+
+class XGBoost < MLModel
+  self.table_name = "ml_models"
+end
+
+class XGBoostHistory < MLModelHistory
+  self.inheritance_column = :model_type
+  self.table_name = "ml_model_histories"
+end
+
 describe Historiographer do
   before(:each) do
     @now = Timecop.freeze
@@ -845,6 +864,43 @@ describe Historiographer do
       expect(PrivatePost.count).to eq(1)
       expect(Post.where(type: 'PrivatePost')).to include(private_post)
       expect(Post.where(type: 'PrivatePost')).not_to include(regular_post)
+    end
+  end
+
+  describe 'Single Table Inheritance with custom inheritance column' do
+    let(:user) { User.create(name: 'Test User') }
+    let(:xgboost) do
+      XGBoost.create(
+        name: 'My XGBoost Model',
+        parameters: { max_depth: 3, eta: 0.1 },
+        history_user_id: user.id
+      )
+    end
+
+    it 'creates history records with correct inheritance' do
+      model = xgboost
+      expect(model.model_name).to eq('XGBoost')
+      expect(model.current_history).to be_a(XGBoostHistory)
+      expect(model.current_history.model_name).to eq('XGBoostHistory')
+    end
+
+    it 'maintains inheritance through updates' do
+      model = xgboost
+      model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
+      
+      expect(model.histories.count).to eq(2)
+      expect(model.histories.all? { |h| h.is_a?(XGBoostHistory) }).to be true
+    end
+
+    it 'reifies with correct class' do
+      model = xgboost
+      original_name = model.name
+      model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
+      model.snapshot
+      
+      reified = MLModel.latest_snapshot
+      expect(reified).to be_a(XGBoostHistory)
+      expect(reified.name).to eq("Updated XGBoost Model")
     end
   end
 

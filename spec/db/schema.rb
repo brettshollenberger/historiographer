@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_11_18_000001) do
+ActiveRecord::Schema[7.1].define(version: 2024_11_88_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -70,6 +70,34 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_18_000001) do
     t.datetime "updated_at", null: false
     t.index ["author_id"], name: "index_comments_on_author_id"
     t.index ["post_id"], name: "index_comments_on_post_id"
+  end
+
+  create_table "ml_model_histories", force: :cascade do |t|
+    t.integer "ml_model_id", null: false
+    t.string "name"
+    t.string "model_type"
+    t.jsonb "parameters"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_ml_model_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_ml_model_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_ml_model_histories_on_history_user_id"
+    t.index ["ml_model_id"], name: "index_ml_model_histories_on_ml_model_id"
+    t.index ["model_type"], name: "index_ml_model_histories_on_model_type"
+    t.index ["snapshot_id"], name: "index_ml_model_histories_on_snapshot_id"
+  end
+
+  create_table "ml_models", force: :cascade do |t|
+    t.string "name"
+    t.string "model_type"
+    t.jsonb "parameters"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["model_type"], name: "index_ml_models_on_model_type"
   end
 
   create_table "post_histories", force: :cascade do |t|

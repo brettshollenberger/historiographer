@@ -167,12 +167,11 @@ module Historiographer
       # Orders by history_started_at and id to handle cases where multiple records
       # have the same history_started_at timestamp
       scope :latest_snapshot, -> {
-        where.not(snapshot_id: nil).order('id DESC').limit(1)&.first
+        where.not(snapshot_id: nil).order('id DESC').limit(1)&.first || none
       }
     end
 
     class_methods do
-
       #
       # The foreign key to the primary class.
       #
