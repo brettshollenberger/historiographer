@@ -36,13 +36,7 @@ module Historiographer
       history_user_id = updates[:history_user_id]
 
       new_histories = records.map do |record|
-        attrs         = record.attributes.clone
-        foreign_key   = history_class.history_foreign_key
-  
-        attrs.merge!(foreign_key => attrs["id"], history_started_at: now, history_user_id: history_user_id)
-  
-        attrs = attrs.except("id")
-
+        attrs = record.history_attrs(now: now)
         record.histories.build(attrs)
       end
 
@@ -72,14 +66,9 @@ module Historiographer
 
           if records.first.respond_to?(:paranoia_destroy)
             new_histories = records.map do |record|
-              attrs         = record.attributes.clone
-              foreign_key   = history_class.history_foreign_key
-        
-              now = UTC.now
-              attrs.merge!(foreign_key => attrs["id"], history_started_at: now, history_user_id: history_user_id, deleted_at: now)
-        
-              attrs = attrs.except("id")
-
+              attrs = record.history_attrs(now: now)
+              attrs[:history_user_id] = history_user_id
+              attrs[:deleted_at] = now
               record.histories.build(attrs)
             end
             history_class.import new_histories

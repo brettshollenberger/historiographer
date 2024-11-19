@@ -2,6 +2,7 @@
 
 require 'active_support/all'
 require 'securerandom'
+require_relative './historiographer/configuration'
 require_relative './historiographer/history'
 require_relative './historiographer/postgres_migration'
 require_relative './historiographer/safe'
@@ -84,10 +85,6 @@ module Historiographer
     after_save :record_history, if: :should_record_history?
     validate :validate_history_user_id_present, if: :should_validate_history_user_id_present?
 
-    # Add scope to fetch latest histories
-    scope :latest_snapshot, -> {
-      history_class.latest_snapshot
-    }
 
     def should_alert_history_user_id_present?
       !snapshot_mode? && !is_history_class? && Thread.current[:skip_history_user_id_validation] != true
@@ -352,6 +349,29 @@ module Historiographer
       end
     end
 
+    def history_class
+      self.class.history_class
+    end
+
+    def history_attrs(snapshot_id: nil, now: nil)
+      attrs = attributes.clone
+      history_class = self.class.history_class
+      foreign_key = history_class.history_foreign_key
+
+      now ||= UTC.now
+      attrs.merge!(foreign_key => attrs['id'], history_started_at: now, history_user_id: history_user_id)
+      attrs.merge!(snapshot_id: snapshot_id) if snapshot_id.present?
+
+      # For STI, ensure we use the correct history class type
+      if self.class.sti_enabled?
+        attrs[self.class.inheritance_column] = history_class.name
+      end
+
+      attrs = attrs.except('id')
+
+      attrs
+    end
+
     private
 
     def history_user_absent_action
@@ -367,19 +387,11 @@ module Historiographer
     def record_history(snapshot_id: nil)
       history_user_absent_action if history_user_id.nil? && should_alert_history_user_id_present?
 
-      attrs = attributes.clone
-      history_class = self.class.history_class
-      foreign_key = history_class.history_foreign_key
-
       now = UTC.now
-      attrs.merge!(foreign_key => attrs['id'], history_started_at: now, history_user_id: history_user_id)
-      attrs.merge!(snapshot_id: snapshot_id) if snapshot_id.present?
-
-      attrs = attrs.except('id')
-
+      attrs = history_attrs(snapshot_id: snapshot_id, now: now)
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
-      if foreign_key.present? && history_class.present?
+      if history_class.history_foreign_key.present? && history_class.present?
         history_class.create!(attrs).tap do |history|
           current_history.update!(history_ended_at: now) if current_history.present?
         end
@@ -397,6 +409,11 @@ module Historiographer
   end
 
   class_methods do
+    def latest_snapshot
+      instance = history_class.latest_snapshot
+      instance.is_a?(history_class) ? instance : nil
+    end
+
     def is_history_class?
       name.match?(/History$/)
     end
@@ -421,6 +438,10 @@ module Historiographer
 
     def get_historiographer_mode
       @historiographer_mode || Historiographer::Configuration.mode
+    end
+
+    def sti_enabled?
+      columns.map(&:name).include?(inheritance_column)
     end
   end
 

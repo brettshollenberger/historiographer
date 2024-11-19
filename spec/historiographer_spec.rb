@@ -26,7 +26,19 @@ class Post < ActiveRecord::Base
 end
 
 class PostHistory < Post
+  include Historiographer::History
   self.table_name = "post_histories"
+end
+
+class PrivatePost < Post
+end
+
+class PrivatePostHistory < PostHistory
+  self.table_name = "post_histories"
+
+  def title
+    "Private — You cannot see!"
+  end
 end
 
 class Comment < ActiveRecord::Base
@@ -89,6 +101,25 @@ end
 
 class CommentHistory < Comment
   self.table_name = "comment_histories"
+end
+
+class MLModel < ActiveRecord::Base
+  include Historiographer
+  self.inheritance_column = :model_type
+end
+
+class MLModelHistory < MLModel
+  self.inheritance_column = :model_type
+  self.table_name = "ml_model_histories"
+end
+
+class XGBoost < MLModel
+  self.table_name = "ml_models"
+end
+
+class XGBoostHistory < MLModelHistory
+  self.inheritance_column = :model_type
+  self.table_name = "ml_model_histories"
 end
 
 describe Historiographer do
@@ -770,6 +801,107 @@ describe Historiographer do
       expect(AuthorHistory.count).to eq 2
     end
 
+  end
+
+  describe 'Single Table Inheritance' do
+    let(:user) { User.create(name: 'Test User') }
+    let(:private_post) do 
+      PrivatePost.create(
+        title: 'Private Post',
+        body: 'This is a private post',
+        author_id: 1,
+        history_user_id: user.id
+      )
+    end
+
+    it 'maintains STI type on create' do
+      expect(private_post).to be_a(PrivatePost)
+      expect(Post.find(private_post.id)).to be_a(PrivatePost)
+      expect(private_post.type).to eq('PrivatePost')
+    end
+
+    it 'maintains STI type in history records' do
+      # Create initial history through snapshot
+      private_post.snapshot
+
+      # Verify history record
+      post_history = PostHistory.last
+      expect(post_history).to be_a(PrivatePostHistory)
+      expect(post_history.type).to eq('PrivatePostHistory')
+      expect(post_history.post_id).to eq(private_post.id)
+
+      # Update and create another history
+      private_post.update(title: 'Updated Private Post', history_user_id: user.id)
+      new_history = PostHistory.last
+      expect(new_history).to be_a(PrivatePostHistory)
+      expect(new_history.type).to eq('PrivatePostHistory')
+    end
+
+    it 'maintains STI type when reifying' do
+      private_post.snapshot
+      original_title = private_post.title
+      
+      private_post.update(title: 'Updated Private Post', history_user_id: user.id)
+      history = PostHistory.where(post_id: private_post.id).first
+
+      reified = PrivatePost.latest_snapshot
+      expect(reified).to be_a(PrivatePostHistory)
+      expect(reified.type).to eq('PrivatePostHistory')
+      expect(reified.title).to eq("Private — You cannot see!")
+    end
+
+    it 'allows querying by type' do
+      regular_post = Post.create(
+        title: 'Regular Post',
+        body: 'This is a regular post',
+        author_id: 1,
+        history_user_id: user.id
+      )
+      
+      private_post # Create private post from let block
+      
+      expect(Post.count).to eq(2)
+      expect(PrivatePost.count).to eq(1)
+      expect(Post.where(type: 'PrivatePost')).to include(private_post)
+      expect(Post.where(type: 'PrivatePost')).not_to include(regular_post)
+    end
+  end
+
+  describe 'Single Table Inheritance with custom inheritance column' do
+    let(:user) { User.create(name: 'Test User') }
+    let(:xgboost) do
+      XGBoost.create(
+        name: 'My XGBoost Model',
+        parameters: { max_depth: 3, eta: 0.1 },
+        history_user_id: user.id
+      )
+    end
+
+    it 'creates history records with correct inheritance' do
+      model = xgboost
+      expect(model.model_name).to eq('XGBoost')
+      expect(model.current_history).to be_a(XGBoostHistory)
+      expect(model.current_history.model_name).to eq('XGBoostHistory')
+    end
+
+    it 'maintains inheritance through updates' do
+      model = xgboost
+      model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
+      
+      expect(model.histories.count).to eq(2)
+      expect(model.histories.all? { |h| h.is_a?(XGBoostHistory) }).to be true
+    end
+
+    it 'reifies with correct class' do
+      model = xgboost
+      original_name = model.name
+      model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
+      model.snapshot
+      
+      reified = MLModel.latest_snapshot
+      expect(reified).to be_a(XGBoostHistory)
+      expect(reified.name).to eq("Updated XGBoost Model")
+    end
   end
 
   describe 'Class-level mode setting' do

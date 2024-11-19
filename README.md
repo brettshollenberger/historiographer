@@ -130,7 +130,174 @@ This can be useful when:
 - You're versioning training data for machine learning models
 - You need to maintain immutable audit trails at specific checkpoints
 
-# Getting Started
+## Single Table Inheritance (STI)
+
+Historiographer fully supports Single Table Inheritance, both with the default `type` column and with custom inheritance columns.
+
+### Default STI with `type` column
+
+```ruby
+class Post < ApplicationRecord
+  include Historiographer
+end
+
+class PrivatePost < Post
+end
+
+# The history classes follow the same inheritance pattern:
+class PostHistory < ApplicationRecord
+  include Historiographer::History
+end
+
+class PrivatePostHistory < PostHistory
+end
+```
+
+History records automatically maintain the correct STI type:
+
+```ruby
+private_post = PrivatePost.create(title: "Secret", history_user_id: current_user.id)
+private_post.snapshot
+
+# History records are the correct subclass
+history = PostHistory.last
+history.is_a?(PrivatePostHistory) #=> true
+history.type #=> "PrivatePostHistory"
+```
+
+### Custom Inheritance Columns
+
+You can also use a custom column for STI instead of the default `type`:
+
+```ruby
+class MLModel < ApplicationRecord
+  include Historiographer
+  self.inheritance_column = :model_type
+end
+
+class XGBoost < MLModel
+  self.table_name = "ml_models"
+end
+
+# History classes use the same custom column
+class MLModelHistory < MLModel
+  self.inheritance_column = :model_type
+  self.table_name = "ml_model_histories"
+end
+
+class XGBoostHistory < MLModelHistory
+end
+```
+
+Migration for custom inheritance column:
+
+```ruby
+create_table :ml_models do |t|
+  t.string :name
+  t.string :model_type  # Custom inheritance column
+  t.jsonb :parameters
+  t.timestamps
+
+  t.index :model_type
+end
+
+create_table :ml_model_histories do |t|
+  t.histories  # Includes all columns from parent table
+end
+```
+
+The custom inheritance column works just like the default `type`:
+
+```ruby
+model = XGBoost.create(name: "My Model", history_user_id: current_user.id)
+model.snapshot
+
+# History records maintain the correct subclass
+history = MLModelHistory.last
+history.is_a?(XGBoostHistory) #=> true
+history.model_type #=> "XGBoostHistory"
+```
+
+### STI and Snapshots: Perfect for Model Versioning
+
+Single Table Inheritance combined with Historiographer's snapshot feature is particularly powerful for versioning machine learning models and other complex systems that need immutable historical records. Here's why:
+
+1. **Type-Safe History**: When you snapshot an ML model, both the model and its parameters are preserved with their exact implementation type. This ensures that when you retrieve historical versions, you get back exactly the right subclass with its specific behavior:
+
+```ruby
+# Create and configure an XGBoost model
+model = XGBoost.create(
+  name: "Customer Churn Predictor v1",
+  parameters: { max_depth: 3, eta: 0.1 },
+  history_user_id: current_user.id
+)
+
+# Take a snapshot before training
+model.snapshot
+
+# Update the model after training
+model.update(
+  name: "Customer Churn Predictor v2",
+  parameters: { max_depth: 5, eta: 0.2 },
+  history_user_id: current_user.id
+)
+
+# Later, retrieve the exact pre-training version
+historical_model = MLModel.latest_snapshot
+historical_model.is_a?(XGBoostHistory) #=> true
+historical_model.parameters #=> { max_depth: 3, eta: 0.1 }
+```
+
+2. **Implementation Versioning**: Different model types often have different parameters, preprocessing steps, or scoring methods. STI ensures these differences are preserved in history:
+
+```ruby
+class XGBoost < MLModel
+  def predict(data)
+    # XGBoost-specific prediction logic
+  end
+end
+
+class RandomForest < MLModel
+  def predict(data)
+    # RandomForest-specific prediction logic
+  end
+end
+
+# Your historical records maintain these implementation differences
+old_model = MLModel.latest_snapshot
+old_model.predict(data) # Uses the exact prediction logic from that point in time
+```
+
+3. **Reproducibility**: Essential for ML workflows where you need to reproduce results or audit model behavior:
+
+```ruby
+# Create model and snapshot at each significant stage
+model = XGBoost.create(name: "Risk Scorer v1", history_user_id: current_user.id)
+
+# Snapshot after initial configuration
+model.snapshot(metadata: { stage: "configuration" })
+
+# Snapshot after training
+model.update(parameters: trained_parameters)
+model.snapshot(metadata: { stage: "post_training" })
+
+# Snapshot after validation
+model.update(parameters: validated_parameters)
+model.snapshot(metadata: { stage: "validated" })
+
+# Later, you can retrieve any version to reproduce results
+initial_version = model.histories.find_by(metadata: { stage: "configuration" })
+trained_version = model.histories.find_by(metadata: { stage: "post_training" })
+```
+
+This combination of STI and snapshots is particularly valuable for:
+- Model governance and compliance
+- A/B testing different model types
+- Debugging model behavior
+- Reproducing historical predictions
+- Maintaining audit trails for regulatory requirements
+
+## Getting Started
 
 Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would.
 
