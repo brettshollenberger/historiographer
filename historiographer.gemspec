@@ -4,15 +4,18 @@
 # -*- encoding: utf-8 -*-
 # stub: historiographer 4.0.0 ruby lib
 
+require File.expand_path('lib/historiographer/version')
+require "date"
+
 Gem::Specification.new do |s|
   s.name = "historiographer".freeze
-  s.version = "4.1.2"
+  s.version = Historiographer::VERSION
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
   s.authors = ["brettshollenberger".freeze]
-  s.date = "2023-08-22"
-  s.description = "Creates separate tables for each history table".freeze
+  s.date = Date.today.strftime("%Y-%m-%d")
+  s.description = "Append-only histories + chained snapshots of your ActiveRecord tables".freeze
   s.email = "brett.shollenberger@gmail.com".freeze
   s.extra_rdoc_files = [
     "LICENSE.txt",
@@ -62,4 +65,3 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<simplecov>.freeze, [">= 0"])
   end
 end
-
