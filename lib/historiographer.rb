@@ -342,7 +342,7 @@ module Historiographer
 
         # Recursively snapshot associations, avoiding infinite loops
         self.class.reflect_on_all_associations.each do |association|
-          associated_records = send(association.name).reload
+          associated_records = send(association.name)&.reload
           Array(associated_records).each do |record|
             model_name = record.class.name
             record_id = record.id
@@ -381,6 +381,10 @@ module Historiographer
       attrs = attrs.except('id')
 
       attrs
+    end
+
+    def latest_snapshot
+      histories.where.not(snapshot_id: nil).order('id DESC').limit(1)&.first || none
     end
 
     private
