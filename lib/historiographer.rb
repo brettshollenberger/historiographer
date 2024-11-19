@@ -185,12 +185,30 @@ module Historiographer
     begin
       class_name.constantize
     rescue StandardError
+      # Get the base table name without _histories suffix
+      base_table = base.table_name.sub(/_histories$/, '')
+      
       history_class_initializer = Class.new(base) do
-        self.table_name = "#{base.table_name}_histories"
-        self.inheritance_column = nil
+        self.table_name = "#{base_table}_histories"
+        
+        # Handle STI properly
+        self.inheritance_column = base.inheritance_column if base.respond_to?(:inheritance_column)
       end
 
-      Object.const_set(class_name, history_class_initializer)
+      # Split the class name into module parts and the actual class name
+      module_parts = class_name.split('::')
+      final_class_name = module_parts.pop
+
+      # Navigate through module hierarchy
+      target_module = module_parts.inject(Object) do |mod, module_name|
+        mod.const_defined?(module_name) ? mod.const_get(module_name) : mod.const_set(module_name, Module.new)
+      end
+
+      # Set the constant in the correct module
+      history_class = target_module.const_set(final_class_name, history_class_initializer)
+      
+      # Now that the class is named, include the History module and extend class methods
+      history_class.send(:include, Historiographer::History)
     end
 
     klass = class_name.constantize
@@ -259,21 +277,13 @@ module Historiographer
       end
     end)
 
-    if base.respond_to?(:histories)
-      raise "#{base} already has histories. Talk to Brett if this is a legit use case."
-    else
-      opts = { class_name: class_name }
-      opts[:foreign_key] = klass.history_foreign_key if klass.respond_to?(:history_foreign_key)
-      if RUBY_VERSION.to_i >= 3
-        has_many :histories, **opts
-        has_one :current_history, -> { current }, **opts
-      else
-        has_many :histories, opts
-        has_one :current_history, -> { current }, opts
-      end
+    def histories
+      history_class.where(history_class.history_foreign_key => self.send(self.class.primary_key))
     end
 
-    klass.send(:include, Historiographer::History) unless klass.ancestors.include?(Historiographer::History)
+    def current_history
+      history_class.where(history_class.history_foreign_key => self.send(self.class.primary_key)).current&.first
+    end
 
     #
     # The acts_as_paranoid gem, which we tend to use with our History classes,
@@ -364,7 +374,8 @@ module Historiographer
 
       # For STI, ensure we use the correct history class type
       if self.class.sti_enabled?
-        attrs[self.class.inheritance_column] = history_class.name
+        type_column = self.class.inheritance_column
+        attrs[type_column] = "#{self.class.name}History"
       end
 
       attrs = attrs.except('id')

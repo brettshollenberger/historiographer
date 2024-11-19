@@ -180,7 +180,7 @@ module Historiographer
       def history_foreign_key
         return @history_foreign_key if @history_foreign_key
 
-        @history_foreign_key = sti_base_class.name.underscore.foreign_key
+        @history_foreign_key = sti_base_class.table_name.singularize.foreign_key
       end
 
       def sti_base_class
