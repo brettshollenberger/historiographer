@@ -526,12 +526,12 @@ describe Historiographer do
       post1 = create_post
       expect(post1.histories.first).to be_a(PostHistory)
 
-      expect(post1.histories.first.post).to be(post1)
+      expect(post1.histories.first.post).to eq(post1)
 
       author1 = create_author
       expect(author1.histories.first).to be_a(AuthorHistory)
 
-      expect(author1.histories.first.author).to be(author1)
+      expect(author1.histories.first.author).to eq(author1)
     end
   end
 
@@ -940,6 +940,90 @@ describe Historiographer do
       class Post < ActiveRecord::Base
         historiographer_mode nil
       end
+    end
+  end
+
+  describe 'Moduleized Classes' do
+    module EasyML
+      class Column < ActiveRecord::Base
+        self.table_name = "easy_ml_columns"
+        self.inheritance_column = :column_type
+        include Historiographer
+      end
+
+      class EncryptedColumn < Column
+        self.table_name = "easy_ml_columns"
+        include Historiographer
+        def encrypted?
+          true
+        end
+      end
+
+      class ColumnHistory < Column
+        self.inheritance_column = :column_type
+        self.table_name = "easy_ml_column_histories"
+        include Historiographer::History
+      end
+
+      class EncryptedColumnHistory < EncryptedColumn
+        self.inheritance_column = :column_type
+        self.table_name = "easy_ml_column_histories"
+        include Historiographer::History
+      end
+    end
+
+    let(:user) { User.create(name: 'Test User') }
+    let(:column) do
+      EasyML::Column.create(
+        name: 'feature_1',
+        data_type: 'numeric',
+        history_user_id: user.id
+      )
+    end
+
+    it 'maintains proper namespacing in history class' do
+      expect(column).to be_a(EasyML::Column)
+      expect(column.histories.first).to be_a(EasyML::ColumnHistory)
+      expect(EasyML::Column.history_class).to eq(EasyML::ColumnHistory)
+    end
+
+    it 'establishes correct foreign key for history association' do
+      col_history = column.histories.first
+      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
+      expect(col_history).to be_a(EasyML::ColumnHistory)
+    end
+
+    it 'establishes correct associations for child classes' do
+      encrypted_col = EasyML::Column.create(
+        name: 'secret_feature',
+        data_type: 'numeric',
+        history_user_id: user.id,
+        column_type: "EasyML::EncryptedColumn"
+      )
+      
+      # Verify the base record
+      expect(encrypted_col).to be_a(EasyML::EncryptedColumn)
+      expect(encrypted_col.encrypted?).to be true
+      
+      # Verify history record
+      col_history = encrypted_col.histories.last
+      expect(col_history).to be_a(EasyML::EncryptedColumnHistory)
+      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
+      expect(col_history.encrypted?).to be true
+    end
+
+    it 'uses correct table names' do
+      expect(EasyML::Column.table_name).to eq('easy_ml_columns')
+      expect(EasyML::ColumnHistory.table_name).to eq('easy_ml_column_histories')
+    end
+
+    it 'creates and updates history records properly' do
+      original_name = column.name
+      column.update(name: 'feature_2', history_user_id: user.id)
+      
+      expect(column.histories.count).to eq(2)
+      expect(column.histories.first.name).to eq(original_name)
+      expect(column.histories.last.name).to eq('feature_2')
     end
   end
 end
