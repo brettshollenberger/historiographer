@@ -171,8 +171,8 @@ You can also use a custom column for STI instead of the default `type`:
 
 ```ruby
 class MLModel < ApplicationRecord
-  include Historiographer
   self.inheritance_column = :model_type
+  include Historiographer
 end
 
 class XGBoost < MLModel
@@ -291,6 +291,7 @@ trained_version = model.histories.find_by(metadata: { stage: "post_training" })
 ```
 
 This combination of STI and snapshots is particularly valuable for:
+
 - Model governance and compliance
 - A/B testing different model types
 - Debugging model behavior
