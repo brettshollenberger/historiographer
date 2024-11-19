@@ -26,7 +26,19 @@ class Post < ActiveRecord::Base
 end
 
 class PostHistory < Post
+  include Historiographer::History
   self.table_name = "post_histories"
+end
+
+class PrivatePost < Post
+end
+
+class PrivatePostHistory < PostHistory
+  self.table_name = "post_histories"
+
+  def title
+    "Private — You cannot see!"
+  end
 end
 
 class Comment < ActiveRecord::Base
@@ -770,6 +782,70 @@ describe Historiographer do
       expect(AuthorHistory.count).to eq 2
     end
 
+  end
+
+  describe 'Single Table Inheritance' do
+    let(:user) { User.create(name: 'Test User') }
+    let(:private_post) do 
+      PrivatePost.create(
+        title: 'Private Post',
+        body: 'This is a private post',
+        author_id: 1,
+        history_user_id: user.id
+      )
+    end
+
+    it 'maintains STI type on create' do
+      expect(private_post).to be_a(PrivatePost)
+      expect(Post.find(private_post.id)).to be_a(PrivatePost)
+      expect(private_post.type).to eq('PrivatePost')
+    end
+
+    it 'maintains STI type in history records' do
+      # Create initial history through snapshot
+      private_post.snapshot
+
+      # Verify history record
+      post_history = PostHistory.last
+      expect(post_history).to be_a(PrivatePostHistory)
+      expect(post_history.type).to eq('PrivatePostHistory')
+      expect(post_history.post_id).to eq(private_post.id)
+
+      # Update and create another history
+      private_post.update(title: 'Updated Private Post', history_user_id: user.id)
+      new_history = PostHistory.last
+      expect(new_history).to be_a(PrivatePostHistory)
+      expect(new_history.type).to eq('PrivatePostHistory')
+    end
+
+    it 'maintains STI type when reifying' do
+      private_post.snapshot
+      original_title = private_post.title
+      
+      private_post.update(title: 'Updated Private Post', history_user_id: user.id)
+      history = PostHistory.where(post_id: private_post.id).first
+
+      reified = PrivatePost.latest_snapshot
+      expect(reified).to be_a(PrivatePostHistory)
+      expect(reified.type).to eq('PrivatePostHistory')
+      expect(reified.title).to eq("Private — You cannot see!")
+    end
+
+    it 'allows querying by type' do
+      regular_post = Post.create(
+        title: 'Regular Post',
+        body: 'This is a regular post',
+        author_id: 1,
+        history_user_id: user.id
+      )
+      
+      private_post # Create private post from let block
+      
+      expect(Post.count).to eq(2)
+      expect(PrivatePost.count).to eq(1)
+      expect(Post.where(type: 'PrivatePost')).to include(private_post)
+      expect(Post.where(type: 'PrivatePost')).not_to include(regular_post)
+    end
   end
 
   describe 'Class-level mode setting' do

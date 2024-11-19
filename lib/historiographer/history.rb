@@ -88,6 +88,7 @@ module Historiographer
       # "RetailerProductHistory."
       #
       foreign_class_name = base.name.gsub(/History$/) {}        # e.g. "RetailerProductHistory" => "RetailerProduct"
+      foreign_class = foreign_class_name.constantize
       association_name   = foreign_class_name.split("::").last.underscore.to_sym # e.g. "RetailerProduct" => :retailer_product
 
       #
@@ -114,6 +115,14 @@ module Historiographer
       else
         belongs_to association_name, class_name: foreign_class_name
       end
+
+      # Enable STI for history classes
+      if foreign_class.sti_enabled?
+        self.inheritance_column = 'type'
+      end
+
+      # Ensure we can't destroy history records
+      before_destroy { |record| raise "Cannot destroy history records" }
 
       #
       # A History record should never be destroyed.
@@ -170,7 +179,20 @@ module Historiographer
       # E.g. PostHistory.history_foreign_key => post_id
       #
       def history_foreign_key
-        name.gsub(/History$/) {}.foreign_key
+        return @history_foreign_key if @history_foreign_key
+
+        @history_foreign_key = sti_base_class.name.underscore.foreign_key
+      end
+
+      def sti_base_class
+        return @sti_base_class if @sti_base_class
+
+        base_name = name.gsub(/History$/, '')
+        base_class = base_name.constantize
+        while base_class.superclass != ActiveRecord::Base
+          base_class = base_class.superclass
+        end
+        @sti_base_class = base_class
       end
     end
   end

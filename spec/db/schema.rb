@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_11_09_182020) do
+ActiveRecord::Schema[7.1].define(version: 2024_11_18_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -86,6 +86,7 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_09_182020) do
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.string "snapshot_id"
+    t.string "type"
     t.index ["author_id"], name: "index_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_post_histories_on_deleted_at"
     t.index ["enabled"], name: "index_post_histories_on_enabled"
@@ -106,10 +107,12 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_09_182020) do
     t.datetime "deleted_at", precision: nil
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
+    t.string "type"
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["deleted_at"], name: "index_posts_on_deleted_at"
     t.index ["enabled"], name: "index_posts_on_enabled"
     t.index ["live_at"], name: "index_posts_on_live_at"
+    t.index ["type"], name: "index_posts_on_type"
   end
 
   create_table "safe_post_histories", force: :cascade do |t|
