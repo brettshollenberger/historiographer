@@ -137,7 +137,7 @@ Historiographer fully supports Single Table Inheritance, both with the default `
 ### Default STI with `type` column
 
 ```ruby
-class Post < ApplicationRecord
+class Post < ActiveRecord::Base
   include Historiographer
 end
 
@@ -145,7 +145,7 @@ class PrivatePost < Post
 end
 
 # The history classes follow the same inheritance pattern:
-class PostHistory < ApplicationRecord
+class PostHistory < ActiveRecord::Base
   include Historiographer::History
 end
 
@@ -170,7 +170,7 @@ history.type #=> "PrivatePostHistory"
 You can also use a custom column for STI instead of the default `type`:
 
 ```ruby
-class MLModel < ApplicationRecord
+class MLModel < ActiveRecord::Base
   self.inheritance_column = :model_type
   include Historiographer
 end
@@ -306,6 +306,11 @@ Whenever you include the `Historiographer` gem in your ActiveRecord model, it al
 class Post < ActiveRecord::Base
   include Historiographer
 end
+
+class PostHistory < ActiveRecord::Base
+  self.table_name = "post_histories"
+  include Historiographer::History
+end
 ```
 
 ### History Modes
@@ -392,12 +397,18 @@ The primary model should include `Historiographer`:
 class Post < ActiveRecord::Base
   include Historiographer
 end
+
+class PostHistory < ActiveRecord::Base
+  self.table_name = "post_histories"
+  include Historiographer::History
+end
 ```
 
 You should also make a `PostHistory` class if you're going to query `PostHistory` from Rails:
 
 ```ruby
 class PostHistory < ActiveRecord::Base
+  self.table_name = "post_histories"
 end
 ```
 
