@@ -139,6 +139,7 @@ module Historiographer
         end
       end
 
+      binding.pry if self.class.name == "EasyML::DateSplitter"
       super
     end
 

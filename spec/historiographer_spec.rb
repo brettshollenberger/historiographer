@@ -1024,7 +1024,7 @@ describe Historiographer do
 
     it 'establishes correct foreign key for history association' do
       col_history = column.histories.first
-      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
+      expect(col_history.class.history_foreign_key).to eq('column_id')
       expect(col_history).to be_a(EasyML::ColumnHistory)
     end
 
@@ -1043,7 +1043,7 @@ describe Historiographer do
       # Verify history record
       col_history = encrypted_col.histories.last
       expect(col_history).to be_a(EasyML::EncryptedColumnHistory)
-      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
+      expect(col_history.class.history_foreign_key).to eq('column_id')
       expect(col_history.encrypted?).to be true
     end
 

@@ -11,7 +11,7 @@ class CreateEasyMlColumns < ActiveRecord::Migration[7.1]
     end
 
     create_table :easy_ml_column_histories do |t|
-      t.histories
+      t.histories(foreign_key: :column_id)
     end
   end
 end

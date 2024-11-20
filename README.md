@@ -298,6 +298,38 @@ This combination of STI and snapshots is particularly valuable for:
 - Reproducing historical predictions
 - Maintaining audit trails for regulatory requirements
 
+## Namespaced Models
+
+When using namespaced models, Rails handles foreign key naming differently than with non-namespaced models. For example, if you have a model namespaced like this:
+
+```ruby
+module EasyML
+  class Dataset
+     self.table_name = "easy_ml_datasets"
+  end
+end
+```
+
+Rails will expect foreign keys to be formatted using just the model name (without the namespace) like this:
+
+```ruby
+:dataset_id
+```
+
+Therefore, when creating history migrations for namespaced models, you need to specify the foreign key name explicitly:
+
+```ruby
+class CreateEasyMLDatasetHistories < ActiveRecord::Migration
+  def change
+    create_table :easy_ml_dataset_histories do |t|
+      t.histories(foreign_key: :dataset_id) # instead of using the table name — easy_ml_dataset_id
+    end
+  end
+end
+```
+
+This ensures that the foreign key relationships are properly established between your namespaced models and their history tables.
+
 ## Getting Started
 
 Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would.
