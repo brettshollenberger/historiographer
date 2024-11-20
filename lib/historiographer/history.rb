@@ -278,15 +278,15 @@ module Historiographer
         when :belongs_to
           belongs_to assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key
+          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key
         when :has_one
           has_one assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key
+          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
         when :has_many
           has_many assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key
+          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
         end
       end
       #
