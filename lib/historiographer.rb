@@ -183,7 +183,7 @@ module Historiographer
 
     begin
       class_name.constantize
-    rescue StandardError
+    rescue NameError
       # Get the base table name without _histories suffix
       base_table = base.table_name.singularize.sub(/_histories$/, '')
       
@@ -216,63 +216,22 @@ module Historiographer
     base.singleton_class.prepend(Module.new do
       def belongs_to(name, scope = nil, **options, &extension)
         super
-        define_history_association(name, :belongs_to, options)
+        history_class.define_history_association(name)
       end
 
       def has_one(name, scope = nil, **options, &extension)
         super
-        define_history_association(name, :has_one, options)
+        history_class.define_history_association(name)
       end
 
       def has_many(name, scope = nil, **options, &extension)
         super
-        define_history_association(name, :has_many, options)
+        history_class.define_history_association(name)
       end
 
       def has_and_belongs_to_many(name, scope = nil, **options, &extension)
         super
-        define_history_association(name, :has_and_belongs_to_many, options)
-      end
-
-      private
-
-      def define_history_association(name, type, options)
-        return if is_history_class?
-        return if @defining_association
-        return if %i[histories current_history].include?(name)
-        @defining_association = true
-
-        history_class = "#{self.name}History".constantize
-        history_class_name = "#{name.to_s.singularize.camelize}History"
-
-        # Get the original association's foreign key
-        original_reflection = self.reflect_on_association(name)
-        foreign_key = original_reflection.foreign_key
-
-        if type == :has_many || type == :has_and_belongs_to_many
-          history_class.send(
-            type, 
-            name, 
-            -> (owner) { where("#{name.to_s.singularize}_histories.snapshot_id = ?", owner.snapshot_id) }, 
-            **options.merge(
-              class_name: history_class_name, 
-              foreign_key: foreign_key,
-              primary_key: foreign_key
-            )
-          )
-        else
-          history_class.send(
-            type, 
-            name, 
-            -> (owner) { where("#{name}_histories.snapshot_id = ?", owner.snapshot_id) }, 
-            **options.merge(
-              class_name: history_class_name, 
-              foreign_key: foreign_key,
-              primary_key: foreign_key
-            )
-          )
-        end
-        @defining_association = false
+        history_class.define_history_association(name)
       end
     end)
 
@@ -332,10 +291,11 @@ module Historiographer
         return if existing_snapshot.present?
 
         null_snapshot = history_class.where(foreign_key => attrs[primary_key], snapshot_id: nil)
+        snapshot = nil
         if null_snapshot.present?
-          null_snapshot.update(snapshot_id: snapshot_id)
+          snapshot = null_snapshot.update(snapshot_id: snapshot_id)
         else
-          record_history(snapshot_id: snapshot_id)
+          snapshot = record_history(snapshot_id: snapshot_id)
         end
 
         # Recursively snapshot associations, avoiding infinite loops
@@ -354,6 +314,8 @@ module Historiographer
             record.snapshot(new_tree, snapshot_id) if record.respond_to?(:snapshot)
           end
         end
+
+        snapshot
       end
     end
 

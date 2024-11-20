@@ -236,34 +236,59 @@ module Historiographer
 
       # Dynamically define associations on the history class
       foreign_class.reflect_on_all_associations.each do |association|
+        define_history_association(association)
+      end
+
+    end
+
+    class_methods do
+      def original_class
+        unless class_variable_defined?(:@@original_class)
+          class_variable_set(:@@original_class, self.name.gsub(/History$/, '').constantize)
+        end
+
+        class_variable_get(:@@original_class)
+      end
+
+      def define_history_association(association)
+        if association.is_a?(Symbol) || association.is_a?(String)
+          association = original_class.reflect_on_association(association)
+        end
         assoc_name = association.name
         assoc_history_class_name = "#{association.class_name}History"
         assoc_foreign_key = association.foreign_key
 
         # Skip if the association is already defined
-        next if base.method_defined?(assoc_name)
+        return if method_defined?(assoc_name)
 
         # Skip through associations to history classes to avoid infinite loops
-        next if association.class_name.end_with?('History')
+        return if association.class_name.end_with?('History')
+
+        # We're writing a belongs_to
+        # The dataset belongs_to the datasource
+        # dataset#datasource_id => datasource.id
+        # 
+        # For the history class, we're writing a belongs_to
+        # the DatasetHistory belongs_to the DatasourceHistory
+        # dataset_history#datasource_id => datasource_history.easy_ml_datasource_id
+        #
+        # The missing piece for us here is whatever DatasourceHistory would call easy_ml_datasource_id (history foreign key?)
 
         case association.macro
         when :belongs_to
-          base.belongs_to assoc_name, ->(history_instance) {
+          belongs_to assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
           }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key
         when :has_one
-          base.has_one assoc_name, ->(history_instance) {
+          has_one assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
           }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key
         when :has_many
-          base.has_many assoc_name, ->(history_instance) {
+          has_many assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
           }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key
         end
       end
-    end
-
-    class_methods do
       #
       # The foreign key to the primary class.
       #
@@ -288,7 +313,7 @@ module Historiographer
     end
 
     def original_class
-      self.class.class_variable_get(:@@original_class)
+      self.class.original_class
     end
 
   private
