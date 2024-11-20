@@ -16,6 +16,13 @@ class Post < ActiveRecord::Base
   acts_as_paranoid
   has_many :comments
 
+  validates :type, inclusion: { in: ['Post', 'PrivatePost', nil] }
+  before_validation :set_defaults
+
+  def set_defaults
+    @type ||= "Post"
+  end
+
   def summary
     "This is a summary of the post."
   end
@@ -143,7 +150,6 @@ class DatasetHistory < Dataset
   self.table_name = "dataset_histories"
   include Historiographer::History
 end
-
 
 describe Historiographer do
   before(:each) do
@@ -532,13 +538,15 @@ describe Historiographer do
   end
 
   describe 'Scopes' do
-    it 'finds current histories' do
+    it 'finds current histories', :focus do
       post1 = create_post
       post1.update(title: 'Better title')
 
       post2 = create_post
       post2.update(title: 'Better title')
 
+
+      binding.pry
       expect(PostHistory.current.pluck(:title)).to all eq 'Better title'
       expect(post1.current_history.title).to eq 'Better title'
     end
@@ -774,7 +782,7 @@ describe Historiographer do
       expect(AuthorHistory.count).to eq 2
 
       # Verify snapshot
-      snapshot_post = Post.latest_snapshot
+      snapshot_post = post.latest_snapshot
       expect(snapshot_post.title).to eq post.title
       expect(snapshot_post.formatted_title).to eq post.formatted_title
 
@@ -867,7 +875,7 @@ describe Historiographer do
       private_post.update(title: 'Updated Private Post', history_user_id: user.id)
       history = PostHistory.where(post_id: private_post.id).first
 
-      reified = PrivatePost.latest_snapshot
+      reified = private_post.latest_snapshot
       expect(reified).to be_a(PrivatePostHistory)
       expect(reified.type).to eq('PrivatePostHistory')
       expect(reified.title).to eq("Private — You cannot see!")
@@ -887,6 +895,25 @@ describe Historiographer do
       expect(PrivatePost.count).to eq(1)
       expect(Post.where(type: 'PrivatePost')).to include(private_post)
       expect(Post.where(type: 'PrivatePost')).not_to include(regular_post)
+    end
+
+    it 'skips type validation in history classes' do
+      # First ensure the base validation works
+      expect { Post.new(
+        title: 'Test Post',
+        body: 'Test body',
+        author_id: 1,
+        history_user_id: user.id,
+        type: 'InvalidType'
+      ) }.to raise_error
+
+      # Now create a private post and try to record its history
+      private_post.snapshot
+
+      # The history record should be created successfully with type 'PrivatePostHistory'
+      private_post_history = private_post.current_history
+      expect(private_post_history).to be_a(PrivatePostHistory)
+      expect(private_post_history.type).to eq('PrivatePostHistory')
     end
   end
 

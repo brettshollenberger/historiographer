@@ -61,6 +61,7 @@ module Historiographer
     extend ActiveSupport::Concern
 
     included do |base|
+      clear_validators!
       #
       # A History class (e.g. RetailerProductHistory) will gain
       # access to a current scope, returning
@@ -147,19 +148,19 @@ module Historiographer
       #
       # If the record was not already persisted, proceed as normal.
       #
-      def save(*args)
+      def save(*args, **kwargs)
         if persisted? && (changes.keys - %w(history_ended_at snapshot_id)).any?
           false
         else
-          super
+          super(*args, **kwargs)
         end
       end
 
-      def save!(*args)
+      def save!(*args, **kwargs)
         if persisted? && (changes.keys - %w(history_ended_at snapshot_id)).any?
           false
         else
-          super
+          super(*args, **kwargs)
         end
       end
 
@@ -167,11 +168,19 @@ module Historiographer
       # Orders by history_started_at and id to handle cases where multiple records
       # have the same history_started_at timestamp
       scope :latest_snapshot, -> {
-        where.not(snapshot_id: nil).order('id DESC').limit(1)&.first || none
+        where.not(snapshot_id: nil)
+          .select('DISTINCT ON (snapshot_id) *')
+          .order('snapshot_id, history_started_at DESC, id DESC')
       }
     end
 
     class_methods do
+      def self.inherited(subclass)
+        super
+        # Skip validations for all history classes since they are snapshots
+        subclass.skip_callback(:validate)
+      end
+
       #
       # The foreign key to the primary class.
       #

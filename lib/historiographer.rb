@@ -85,7 +85,6 @@ module Historiographer
     after_save :record_history, if: :should_record_history?
     validate :validate_history_user_id_present, if: :should_validate_history_user_id_present?
 
-
     def should_alert_history_user_id_present?
       !snapshot_mode? && !is_history_class? && Thread.current[:skip_history_user_id_validation] != true
     end
@@ -407,9 +406,10 @@ module Historiographer
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
       if history_class.history_foreign_key.present? && history_class.present?
-        history_class.create!(attrs).tap do |history|
-          current_history.update!(history_ended_at: now) if current_history.present?
-        end
+        instance = history_class.new(attrs)
+        instance.save(validate: false)
+        current_history.update!(history_ended_at: now) if current_history.present?
+        instance
       else
         raise 'Need foreign key and history class to save history!'
       end
