@@ -185,13 +185,13 @@ module Historiographer
       class_name.constantize
     rescue StandardError
       # Get the base table name without _histories suffix
-      base_table = base.table_name.sub(/_histories$/, '')
+      base_table = base.table_name.singularize.sub(/_histories$/, '')
       
-      history_class_initializer = Class.new(base) do
+      history_class_initializer = Class.new(ActiveRecord::Base) do
         self.table_name = "#{base_table}_histories"
         
         # Handle STI properly
-        self.inheritance_column = base.inheritance_column if base.respond_to?(:inheritance_column)
+        self.inheritance_column = base.inheritance_column if base.sti_enabled?
       end
 
       # Split the class name into module parts and the actual class name
@@ -317,7 +317,6 @@ module Historiographer
       save!(*args, &block)
       @no_history = false
     end
-
     
     def snapshot(tree = {}, snapshot_id = nil)
       return if is_history_class?
