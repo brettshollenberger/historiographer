@@ -343,6 +343,29 @@ class Comment < ActiveRecord::Base
 end
 ```
 
+The class-level mode setting takes precedence over the global configuration. This allows you to:
+
+- Have different history tracking strategies for different models
+- Set most models to use snapshots while keeping detailed history for critical models
+- Optimize storage by only tracking detailed history where needed
+
+For example:
+
+```ruby
+# Global setting for most models
+Historiographer::Configuration.mode = :snapshot_only
+
+class Order < ActiveRecord::Base
+  include Historiographer
+  # Uses global :snapshot_only mode
+end
+
+class Payment < ActiveRecord::Base
+  include Historiographer
+  historiographer_mode :histories  # Override to record histories of every change
+end
+```
+
 ## Create A Migration
 
 You need a separate table to store histories for each model.

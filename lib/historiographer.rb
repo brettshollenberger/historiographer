@@ -381,8 +381,12 @@ module Historiographer
       attrs
     end
 
+    def snapshots
+      histories.where.not(snapshot_id: nil)
+    end
+
     def latest_snapshot
-      histories.where.not(snapshot_id: nil).order('id DESC').limit(1)&.first || none
+      snapshots.order('id DESC').limit(1)&.first || history_class.none
     end
 
     private
@@ -405,10 +409,9 @@ module Historiographer
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
       if history_class.history_foreign_key.present? && history_class.present?
-        instance = history_class.new(attrs)
-        instance.save(validate: false)
-        current_history.update!(history_ended_at: now) if current_history.present?
-        instance
+        history_class.create!(attrs).tap do |new_history|
+          current_history.update!(history_ended_at: now) if current_history.present?
+        end
       else
         raise 'Need foreign key and history class to save history!'
       end

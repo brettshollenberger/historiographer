@@ -44,6 +44,10 @@ class PrivatePost < Post
   def title
     "Private — You cannot see!"
   end
+
+  def formatted_title
+    "Private — You cannot see!"
+  end
 end
 
 class PrivatePostHistory < ActiveRecord::Base
@@ -555,6 +559,21 @@ describe Historiographer do
       expect(PostHistory.count).to be 0
 
       Post.skip_callback(:save, :after, :raise_error)
+    end
+  end
+
+  describe 'Method stubbing' do
+    it 'handles adding method appropriately' do
+      post = PrivatePost.create(title: 'Post 1', body: "Hello", author_id: 1, history_user_id: 1)
+      expect(post.formatted_title).to eq("Private — You cannot see!")
+      
+      allow_any_instance_of(PrivatePost).to receive(:formatted_title).and_return("New Title")
+      expect(post.formatted_title).to eq("New Title")
+      
+      # Ensure history still works
+      post.update(title: 'Updated Title', history_user_id: user.id)
+      expect(post.histories.count).to eq(2)
+      expect(post.histories.first.class).to eq(PrivatePostHistory)  # Verify correct history class
     end
   end
 

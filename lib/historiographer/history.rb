@@ -102,19 +102,32 @@ module Historiographer
           alias_method :original_method_added, :method_added
         end
 
+        method_map = Hash.new(0)
         define_method(:method_added) do |method_name|
-          # Call original method_added if it exists
-          original_method_added(method_name) if respond_to?(:original_method_added)
+          # Skip if we're already in the process of defining a method
+          return if Thread.current[:defining_historiographer_method]
 
-          # Get the method object to check if it's from our class (not inherited)
-          method_obj = instance_method(method_name)
-          return unless method_obj.owner == foreign_class #self
+          begin
+            Thread.current[:defining_historiographer_method] = true
+            
+            # Call original method_added if it exists
+            original_method_added(method_name) if respond_to?(:original_method_added)
 
-          # Define the method in the history class
-          foreign_class.history_class.class_eval do
-            define_method(method_name) do |*args, &block|
-              forward_method(method_name, *args, &block)
+            # Get the method object to check if it's from our class (not inherited)
+            method_obj = instance_method(method_name)
+            return unless method_obj.owner == self
+
+            # Skip if we've already defined this method in the history class
+            return if foreign_class.history_class.method_defined?(method_name)
+
+            # Define the method in the history class
+            foreign_class.history_class.class_eval do
+              define_method(method_name) do |*args, &block|
+                forward_method(method_name, *args, &block)
+              end
             end
+          ensure
+            Thread.current[:defining_historiographer_method] = false
           end
         end
       end
