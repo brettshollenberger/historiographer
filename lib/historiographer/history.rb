@@ -61,6 +61,7 @@ module Historiographer
     extend ActiveSupport::Concern
 
     included do |base|
+      clear_validators!
       #
       # A History class (e.g. RetailerProductHistory) will gain
       # access to a current scope, returning
@@ -90,6 +91,67 @@ module Historiographer
       foreign_class_name = base.name.gsub(/History$/) {}        # e.g. "RetailerProductHistory" => "RetailerProduct"
       foreign_class = foreign_class_name.constantize
       association_name   = foreign_class_name.split("::").last.underscore.to_sym # e.g. "RetailerProduct" => :retailer_product
+
+      # Store the original class for method delegation
+      class_variable_set(:@@original_class, foreign_class)
+
+      # Add method_added hook to the original class
+      foreign_class.singleton_class.class_eval do
+        # Keep track of original method_added if it exists
+        if method_defined?(:method_added)
+          alias_method :original_method_added, :method_added
+        end
+
+        method_map = Hash.new(0)
+        define_method(:method_added) do |method_name|
+          # Skip if we're already in the process of defining a method
+          return if Thread.current[:defining_historiographer_method]
+
+          begin
+            Thread.current[:defining_historiographer_method] = true
+            
+            # Call original method_added if it exists
+            original_method_added(method_name) if respond_to?(:original_method_added)
+
+            # Get the method object to check if it's from our class (not inherited)
+            method_obj = instance_method(method_name)
+            return unless method_obj.owner == self
+
+            # Skip if we've already defined this method in the history class
+            return if foreign_class.history_class.method_defined?(method_name)
+
+            # Define the method in the history class
+            foreign_class.history_class.class_eval do
+              define_method(method_name) do |*args, &block|
+                forward_method(method_name, *args, &block)
+              end
+            end
+          ensure
+            Thread.current[:defining_historiographer_method] = false
+          end
+        end
+      end
+
+      foreign_class.columns.map(&:name).each do |method_name|
+        define_method(method_name) do |*args, &block|
+          forward_method(method_name, *args, &block)
+        end
+      end
+
+      # Add method_missing for any methods we might have missed
+      def method_missing(method_name, *args, &block)
+        original_class = self.class.class_variable_get(:@@original_class)
+        if original_class.method_defined?(method_name)
+          forward_method(method_name, *args, &block)
+        else
+          super
+        end
+      end
+
+      def respond_to_missing?(method_name, include_private = false)
+        original_class = self.class.class_variable_get(:@@original_class)
+        original_class.method_defined?(method_name) || super
+      end
 
       #
       # Historiographer will automatically setup the association
@@ -147,19 +209,19 @@ module Historiographer
       #
       # If the record was not already persisted, proceed as normal.
       #
-      def save(*args)
+      def save(*args, **kwargs)
         if persisted? && (changes.keys - %w(history_ended_at snapshot_id)).any?
           false
         else
-          super
+          super(*args, **kwargs)
         end
       end
 
-      def save!(*args)
+      def save!(*args, **kwargs)
         if persisted? && (changes.keys - %w(history_ended_at snapshot_id)).any?
           false
         else
-          super
+          super(*args, **kwargs)
         end
       end
 
@@ -167,11 +229,66 @@ module Historiographer
       # Orders by history_started_at and id to handle cases where multiple records
       # have the same history_started_at timestamp
       scope :latest_snapshot, -> {
-        where.not(snapshot_id: nil).order('id DESC').limit(1)&.first || none
+        where.not(snapshot_id: nil)
+          .select('DISTINCT ON (snapshot_id) *')
+          .order('snapshot_id, history_started_at DESC, id DESC')
       }
+
+      # Dynamically define associations on the history class
+      foreign_class.reflect_on_all_associations.each do |association|
+        define_history_association(association)
+      end
+
     end
 
     class_methods do
+      def original_class
+        unless class_variable_defined?(:@@original_class)
+          class_variable_set(:@@original_class, self.name.gsub(/History$/, '').constantize)
+        end
+
+        class_variable_get(:@@original_class)
+      end
+
+      def define_history_association(association)
+        if association.is_a?(Symbol) || association.is_a?(String)
+          association = original_class.reflect_on_association(association)
+        end
+        assoc_name = association.name
+        assoc_history_class_name = "#{association.class_name}History"
+        assoc_foreign_key = association.foreign_key
+
+        # Skip if the association is already defined
+        return if method_defined?(assoc_name)
+
+        # Skip through associations to history classes to avoid infinite loops
+        return if association.class_name.end_with?('History')
+
+        # We're writing a belongs_to
+        # The dataset belongs_to the datasource
+        # dataset#datasource_id => datasource.id
+        # 
+        # For the history class, we're writing a belongs_to
+        # the DatasetHistory belongs_to the DatasourceHistory
+        # dataset_history#datasource_id => datasource_history.easy_ml_datasource_id
+        #
+        # The missing piece for us here is whatever DatasourceHistory would call easy_ml_datasource_id (history foreign key?)
+
+        case association.macro
+        when :belongs_to
+          belongs_to assoc_name, ->(history_instance) {
+            where(snapshot_id: history_instance.snapshot_id)
+          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key
+        when :has_one
+          has_one assoc_name, ->(history_instance) {
+            where(snapshot_id: history_instance.snapshot_id)
+          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+        when :has_many
+          has_many assoc_name, ->(history_instance) {
+            where(snapshot_id: history_instance.snapshot_id)
+          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+        end
+      end
       #
       # The foreign key to the primary class.
       #
@@ -180,7 +297,8 @@ module Historiographer
       def history_foreign_key
         return @history_foreign_key if @history_foreign_key
 
-        @history_foreign_key = sti_base_class.table_name.singularize.foreign_key
+        # CAN THIS BE TABLE OR MODEL?
+        @history_foreign_key = sti_base_class.name.singularize.foreign_key
       end
 
       def sti_base_class
@@ -193,6 +311,31 @@ module Historiographer
         end
         @sti_base_class = base_class
       end
+    end
+
+    def original_class
+      self.class.original_class
+    end
+
+  private
+    def dummy_instance
+      return @dummy_instance if @dummy_instance
+
+      cannot_keep_cols = %w(history_started_at history_ended_at history_user_id snapshot_id)
+      cannot_keep_cols += [self.class.inheritance_column.to_sym] if self.original_class.sti_enabled?
+      cannot_keep_cols += [self.class.history_foreign_key] 
+      cannot_keep_cols.map!(&:to_s)
+
+      attrs = attributes.clone
+      attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
+
+      instance = original_class.find_or_initialize_by(original_class.primary_key => attrs[original_class.primary_key])
+      instance.assign_attributes(attrs.except(*cannot_keep_cols))
+      @dummy_instance = instance
+    end
+
+    def forward_method(method_name, *args, &block)
+      dummy_instance.send(method_name, *args, &block)
     end
   end
 end

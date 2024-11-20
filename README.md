@@ -137,7 +137,7 @@ Historiographer fully supports Single Table Inheritance, both with the default `
 ### Default STI with `type` column
 
 ```ruby
-class Post < ApplicationRecord
+class Post < ActiveRecord::Base
   include Historiographer
 end
 
@@ -145,7 +145,7 @@ class PrivatePost < Post
 end
 
 # The history classes follow the same inheritance pattern:
-class PostHistory < ApplicationRecord
+class PostHistory < ActiveRecord::Base
   include Historiographer::History
 end
 
@@ -170,7 +170,7 @@ history.type #=> "PrivatePostHistory"
 You can also use a custom column for STI instead of the default `type`:
 
 ```ruby
-class MLModel < ApplicationRecord
+class MLModel < ActiveRecord::Base
   self.inheritance_column = :model_type
   include Historiographer
 end
@@ -298,6 +298,38 @@ This combination of STI and snapshots is particularly valuable for:
 - Reproducing historical predictions
 - Maintaining audit trails for regulatory requirements
 
+## Namespaced Models
+
+When using namespaced models, Rails handles foreign key naming differently than with non-namespaced models. For example, if you have a model namespaced like this:
+
+```ruby
+module EasyML
+  class Dataset
+     self.table_name = "easy_ml_datasets"
+  end
+end
+```
+
+Rails will expect foreign keys to be formatted using just the model name (without the namespace) like this:
+
+```ruby
+:dataset_id
+```
+
+Therefore, when creating history migrations for namespaced models, you need to specify the foreign key name explicitly:
+
+```ruby
+class CreateEasyMLDatasetHistories < ActiveRecord::Migration
+  def change
+    create_table :easy_ml_dataset_histories do |t|
+      t.histories(foreign_key: :dataset_id) # instead of using the table name — easy_ml_dataset_id
+    end
+  end
+end
+```
+
+This ensures that the foreign key relationships are properly established between your namespaced models and their history tables.
+
 ## Getting Started
 
 Whenever you include the `Historiographer` gem in your ActiveRecord model, it allows you to insert, update, or delete data as you normally would.
@@ -305,6 +337,11 @@ Whenever you include the `Historiographer` gem in your ActiveRecord model, it al
 ```ruby
 class Post < ActiveRecord::Base
   include Historiographer
+end
+
+class PostHistory < ActiveRecord::Base
+  self.table_name = "post_histories"
+  include Historiographer::History
 end
 ```
 
@@ -335,6 +372,29 @@ end
 class Comment < ActiveRecord::Base
   include Historiographer
   historiographer_mode :histories  # Record history for every change (default)
+end
+```
+
+The class-level mode setting takes precedence over the global configuration. This allows you to:
+
+- Have different history tracking strategies for different models
+- Set most models to use snapshots while keeping detailed history for critical models
+- Optimize storage by only tracking detailed history where needed
+
+For example:
+
+```ruby
+# Global setting for most models
+Historiographer::Configuration.mode = :snapshot_only
+
+class Order < ActiveRecord::Base
+  include Historiographer
+  # Uses global :snapshot_only mode
+end
+
+class Payment < ActiveRecord::Base
+  include Historiographer
+  historiographer_mode :histories  # Override to record histories of every change
 end
 ```
 
@@ -392,12 +452,18 @@ The primary model should include `Historiographer`:
 class Post < ActiveRecord::Base
   include Historiographer
 end
+
+class PostHistory < ActiveRecord::Base
+  self.table_name = "post_histories"
+  include Historiographer::History
+end
 ```
 
 You should also make a `PostHistory` class if you're going to query `PostHistory` from Rails:
 
 ```ruby
 class PostHistory < ActiveRecord::Base
+  self.table_name = "post_histories"
 end
 ```
 

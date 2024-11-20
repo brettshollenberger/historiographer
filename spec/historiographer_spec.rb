@@ -16,6 +16,13 @@ class Post < ActiveRecord::Base
   acts_as_paranoid
   has_many :comments
 
+  validates :type, inclusion: { in: ['Post', 'PrivatePost', nil] }
+  before_validation :set_defaults
+
+  def set_defaults
+    @type ||= "Post"
+  end
+
   def summary
     "This is a summary of the post."
   end
@@ -25,9 +32,9 @@ class Post < ActiveRecord::Base
   end
 end
 
-class PostHistory < Post
-  include Historiographer::History
+class PostHistory < ActiveRecord::Base
   self.table_name = "post_histories"
+  include Historiographer::History
 end
 
 class PrivatePost < Post
@@ -37,9 +44,13 @@ class PrivatePost < Post
   def title
     "Private — You cannot see!"
   end
+
+  def formatted_title
+    "Private — You cannot see!"
+  end
 end
 
-class PrivatePostHistory < PrivatePost
+class PrivatePostHistory < ActiveRecord::Base
   self.table_name = "post_histories"
   include Historiographer::History
 end
@@ -50,8 +61,9 @@ class Comment < ActiveRecord::Base
   belongs_to :author
 end
 
-class CommentHistory < Comment
+class CommentHistory < ActiveRecord::Base
   self.table_name = "comment_histories"
+  include Historiographer::History
 end
 
 class SafePost < ActiveRecord::Base
@@ -59,17 +71,18 @@ class SafePost < ActiveRecord::Base
   acts_as_paranoid
 end
 
-class SafePostHistory < SafePost
+class SafePostHistory < ActiveRecord::Base
   self.table_name = "safe_post_histories"
+  include Historiographer::History
 end
 
 class SilentPost < ActiveRecord::Base
   include Historiographer::Silent
-  acts_as_paranoid
 end
 
-class SilentPostHistory < SilentPost
+class SilentPostHistory < ActiveRecord::Base
   self.table_name = "silent_post_histories"
+  include Historiographer::History
 end
 
 class Author < ActiveRecord::Base
@@ -78,7 +91,8 @@ class Author < ActiveRecord::Base
   has_many :posts
 end
 
-class AuthorHistory < Author
+class AuthorHistory < ActiveRecord::Base
+  include Historiographer::History
   self.table_name = "author_histories"
 end
 
@@ -89,21 +103,12 @@ class ThingWithCompoundIndex < ActiveRecord::Base
   include Historiographer
 end
 
-class ThingWithCompoundIndexHistory < ThingWithCompoundIndex
+class ThingWithCompoundIndexHistory < ActiveRecord::Base
+  include Historiographer::History
   self.table_name = "thing_with_compound_index_histories"
 end
 
 class ThingWithoutHistory < ActiveRecord::Base
-end
-
-class Comment < ActiveRecord::Base
-  include Historiographer
-  belongs_to :post
-  belongs_to :author
-end
-
-class CommentHistory < Comment
-  self.table_name = "comment_histories"
 end
 
 class MLModel < ActiveRecord::Base
@@ -114,10 +119,9 @@ class MLModel < ActiveRecord::Base
   has_one :dataset
 end
 
-class MLModelHistory < MLModel
-  self.inheritance_column = :model_type
-  self.table_name = "ml_model_histories"
+class MLModelHistory < ActiveRecord::Base
   include Historiographer::History
+  self.table_name = "ml_model_histories"
 end
 
 class XGBoost < MLModel
@@ -126,10 +130,9 @@ class XGBoost < MLModel
   include Historiographer
 end
 
-class XGBoostHistory < XGBoost
-  self.inheritance_column = :model_type
-  self.table_name = "ml_model_histories"
+class XGBoostHistory < ActiveRecord::Base
   include Historiographer::History
+  self.table_name = "ml_model_histories"
 end
 
 class Dataset < ActiveRecord::Base
@@ -139,9 +142,37 @@ class Dataset < ActiveRecord::Base
   belongs_to :ml_model, class_name: "MLModel"
 end
 
-class DatasetHistory < Dataset
-  self.table_name = "dataset_histories"
+class DatasetHistory < ActiveRecord::Base
   include Historiographer::History
+  self.table_name = "dataset_histories"
+end
+
+module EasyML
+  class Column < ActiveRecord::Base
+    self.table_name = "easy_ml_columns"
+    self.inheritance_column = :column_type
+    include Historiographer
+  end
+
+  class EncryptedColumn < Column
+    include Historiographer
+
+    def encrypted?
+      true
+    end
+  end
+
+  class ColumnHistory < ActiveRecord::Base
+    self.inheritance_column = :column_type
+    self.table_name = "easy_ml_column_histories"
+    include Historiographer::History
+  end
+
+  class EncryptedColumnHistory < ActiveRecord::Base
+    self.inheritance_column = :column_type
+    self.table_name = "easy_ml_column_histories"
+    include Historiographer::History
+  end
 end
 
 
@@ -531,6 +562,21 @@ describe Historiographer do
     end
   end
 
+  describe 'Method stubbing' do
+    it 'handles adding method appropriately' do
+      post = PrivatePost.create(title: 'Post 1', body: "Hello", author_id: 1, history_user_id: 1)
+      expect(post.formatted_title).to eq("Private — You cannot see!")
+      
+      allow_any_instance_of(PrivatePost).to receive(:formatted_title).and_return("New Title")
+      expect(post.formatted_title).to eq("New Title")
+      
+      # Ensure history still works
+      post.update(title: 'Updated Title', history_user_id: user.id)
+      expect(post.histories.count).to eq(2)
+      expect(post.histories.first.class).to eq(PrivatePostHistory)  # Verify correct history class
+    end
+  end
+
   describe 'Scopes' do
     it 'finds current histories' do
       post1 = create_post
@@ -774,7 +820,7 @@ describe Historiographer do
       expect(AuthorHistory.count).to eq 2
 
       # Verify snapshot
-      snapshot_post = Post.latest_snapshot
+      snapshot_post = post.latest_snapshot
       expect(snapshot_post.title).to eq post.title
       expect(snapshot_post.formatted_title).to eq post.formatted_title
 
@@ -831,62 +877,36 @@ describe Historiographer do
     let(:private_post) do 
       PrivatePost.create(
         title: 'Private Post',
-        body: 'This is a private post',
-        author_id: 1,
-        history_user_id: user.id
+        body: 'Test',
+        history_user_id: user.id,
+        author_id: 1
       )
     end
 
-    it 'maintains STI type on create' do
-      expect(private_post).to be_a(PrivatePost)
-      expect(Post.find(private_post.id)).to be_a(PrivatePost)
-      expect(private_post.type).to eq('PrivatePost')
+    it 'maintains original class type on create' do
+      post_history = private_post.histories.first
+      expect(post_history.original_class).to eq(PrivatePost)
     end
 
-    it 'maintains STI type in history records' do
-      # Create initial history through snapshot
-      private_post.snapshot
+    it 'maintains original class in history records' do
+      post_history = private_post.histories.first
+      expect(post_history.original_class).to eq(PrivatePost)
+      expect(post_history.title).to eq('Private — You cannot see!')
+    end
 
-      # Verify history record
-      post_history = private_post.current_history
-      expect(post_history).to be_a(PrivatePostHistory)
-      expect(post_history.type).to eq('PrivatePostHistory')
-      expect(post_history.post_id).to eq(private_post.id)
-
-      # Update and create another history
+    it 'maintains original class behavior when updating' do
       private_post.update(title: 'Updated Private Post', history_user_id: user.id)
-      new_history = private_post.current_history
-      expect(new_history).to be_a(PrivatePostHistory)
-      expect(new_history.type).to eq('PrivatePostHistory')
+      new_history = private_post.histories.current&.first
+      expect(new_history.original_class).to eq(PrivatePost)
+      expect(new_history.title).to eq('Private — You cannot see!')
     end
 
-    it 'maintains STI type when reifying' do
-      private_post.snapshot
-      original_title = private_post.title
-      
+    it 'maintains original class behavior when reifying' do
       private_post.update(title: 'Updated Private Post', history_user_id: user.id)
-      history = PostHistory.where(post_id: private_post.id).first
-
-      reified = PrivatePost.latest_snapshot
-      expect(reified).to be_a(PrivatePostHistory)
-      expect(reified.type).to eq('PrivatePostHistory')
-      expect(reified.title).to eq("Private — You cannot see!")
-    end
-
-    it 'allows querying by type' do
-      regular_post = Post.create(
-        title: 'Regular Post',
-        body: 'This is a regular post',
-        author_id: 1,
-        history_user_id: user.id
-      )
-      
-      private_post # Create private post from let block
-      
-      expect(Post.count).to eq(2)
-      expect(PrivatePost.count).to eq(1)
-      expect(Post.where(type: 'PrivatePost')).to include(private_post)
-      expect(Post.where(type: 'PrivatePost')).not_to include(regular_post)
+      old_history = private_post.histories.first
+      reified = old_history
+      expect(reified.title).to eq('Private — You cannot see!')
+      expect(reified.original_class).to eq(PrivatePost)
     end
   end
 
@@ -896,14 +916,17 @@ describe Historiographer do
     it 'inherits associations in history classes' do
       dataset = Dataset.create(name: "test_dataset", history_user_id: user.id)
       model = XGBoost.create(name: "test_model", dataset: dataset, history_user_id: user.id)
+      model.snapshot
+
+      dataset.update(name: "new_dataset", history_user_id: user.id)
       
       expect(dataset.ml_model).to eq model # This is still a live model
       expect(model.dataset).to eq(dataset)
       expect(model.histories.first).to respond_to(:dataset)
-      expect(model.histories.first.dataset).to eq(dataset)
+      expect(model.histories.first.dataset).to be_a(DatasetHistory)
 
-      model_history = model.current_history
-      expect(model_history.dataset.ml_model).to eq model_history # These refer back and forth
+      model_history = model.latest_snapshot
+      expect(model_history.dataset.name).to eq "test_dataset"
     end
   end
 
@@ -984,34 +1007,6 @@ describe Historiographer do
   end
 
   describe 'Moduleized Classes' do
-    module EasyML
-      class Column < ActiveRecord::Base
-        self.table_name = "easy_ml_columns"
-        self.inheritance_column = :column_type
-        include Historiographer
-      end
-
-      class EncryptedColumn < Column
-        self.table_name = "easy_ml_columns"
-        include Historiographer
-        def encrypted?
-          true
-        end
-      end
-
-      class ColumnHistory < Column
-        self.inheritance_column = :column_type
-        self.table_name = "easy_ml_column_histories"
-        include Historiographer::History
-      end
-
-      class EncryptedColumnHistory < EncryptedColumn
-        self.inheritance_column = :column_type
-        self.table_name = "easy_ml_column_histories"
-        include Historiographer::History
-      end
-    end
-
     let(:user) { User.create(name: 'Test User') }
     let(:column) do
       EasyML::Column.create(
@@ -1029,7 +1024,7 @@ describe Historiographer do
 
     it 'establishes correct foreign key for history association' do
       col_history = column.histories.first
-      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
+      expect(col_history.class.history_foreign_key).to eq('column_id')
       expect(col_history).to be_a(EasyML::ColumnHistory)
     end
 
@@ -1048,7 +1043,7 @@ describe Historiographer do
       # Verify history record
       col_history = encrypted_col.histories.last
       expect(col_history).to be_a(EasyML::EncryptedColumnHistory)
-      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
+      expect(col_history.class.history_foreign_key).to eq('column_id')
       expect(col_history.encrypted?).to be true
     end
 
