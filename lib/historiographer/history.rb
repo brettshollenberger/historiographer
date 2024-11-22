@@ -209,6 +209,9 @@ module Historiographer
 
         # Skip through associations to history classes to avoid infinite loops
         return if association.class_name.end_with?('History')
+        base_module = association.active_record.name.split("::")[0..-2].join("::").try(:constantize) || Object
+        klass = base_module.const_get(association.class_name)
+        is_sti = klass.respond_to?(:sti_enabled?) && klass.sti_enabled?
 
         case association.macro
         when :belongs_to
