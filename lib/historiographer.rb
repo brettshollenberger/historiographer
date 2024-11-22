@@ -342,6 +342,15 @@ module Historiographer
         attrs[type_column] = "#{self.class.name}History"
       end
 
+      # For polymorphic associations, ensure we use the correct history class type
+      self.class.reflect_on_all_associations.select do |association|
+        association.options.key?(:polymorphic)
+      end.each do |association|
+        assoc = self.send(association.name)
+        type = assoc.respond_to?(association.foreign_type) ? assoc.send(association.foreign_type) : association.foreign_type
+        attrs[association.foreign_type] = "#{type}History"
+      end
+
       attrs = attrs.except('id')
 
       attrs
@@ -375,9 +384,22 @@ module Historiographer
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
       if history_class.history_foreign_key.present? && history_class.present?
+        history_class.define_singleton_method(:run_callbacks) do |*args, &block|
+          yield
+        end
+
+        # Perform save without any callbacks
         history_instance = history_class.new(attrs)
         history_instance.save(validate: false)
-        current_history.update!(history_ended_at: now) if current_history.present?
+
+        if current_history
+          current_history.history_ended_at = now
+          current_history.save(validate: false)
+        end
+
+        # Restore original behavior after operation
+        history_class.singleton_class.remove_method(:run_callbacks)
+
         history_instance
       else
         raise 'Need foreign key and history class to save history!'

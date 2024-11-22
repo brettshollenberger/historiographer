@@ -215,9 +215,15 @@ module Historiographer
 
         case association.macro
         when :belongs_to
+          options = {}
+          if association.options.key?(:polymorphic)
+            options.merge!(polymorphic: true, foreign_key: assoc_foreign_key, primary_key: association.active_record.primary_key)
+          else
+            options.merge!(class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key)
+          end
           belongs_to assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key
+          }, **options
         when :has_one
           has_one assoc_name, ->(history_instance) {
             where(snapshot_id: history_instance.snapshot_id)
