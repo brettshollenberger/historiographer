@@ -187,7 +187,7 @@ module Historiographer
       # Get the base table name without _histories suffix
       base_table = base.table_name.singularize.sub(/_histories$/, '')
       
-      history_class_initializer = Class.new(ActiveRecord::Base) do
+      history_class_initializer = Class.new(base) do
         self.table_name = "#{base_table}_histories"
         
         # Handle STI properly
@@ -216,21 +216,25 @@ module Historiographer
     base.singleton_class.prepend(Module.new do
       def belongs_to(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
 
       def has_one(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
 
       def has_many(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
 
       def has_and_belongs_to_many(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
     end)
@@ -371,9 +375,10 @@ module Historiographer
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
       if history_class.history_foreign_key.present? && history_class.present?
-        history_class.create!(attrs).tap do |new_history|
-          current_history.update!(history_ended_at: now) if current_history.present?
-        end
+        history_instance = history_class.new(attrs)
+        history_instance.save(validate: false)
+        current_history.update!(history_ended_at: now) if current_history.present?
+        history_instance
       else
         raise 'Need foreign key and history class to save history!'
       end
