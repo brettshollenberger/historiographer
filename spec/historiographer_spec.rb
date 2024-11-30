@@ -11,171 +11,6 @@ def expect_rails_errors(errors, expected_errors)
   expect(actual_errors).to eq(expected_errors)
 end
 
-class Post < ActiveRecord::Base
-  include Historiographer
-  acts_as_paranoid
-  has_many :comments
-
-  validates :type, inclusion: { in: ['Post', 'PrivatePost', nil] }
-  before_validation :set_defaults
-
-  def set_defaults
-    @type ||= "Post"
-  end
-
-  def summary
-    "This is a summary of the post."
-  end
-
-  def formatted_title
-    "Title: #{title}"
-  end
-end
-
-class PostHistory < ActiveRecord::Base
-  self.table_name = "post_histories"
-  include Historiographer::History
-end
-
-class PrivatePost < Post
-  self.table_name = "posts"
-  include Historiographer
-
-  def title
-    "Private — You cannot see!"
-  end
-
-  def formatted_title
-    "Private — You cannot see!"
-  end
-end
-
-class PrivatePostHistory < ActiveRecord::Base
-  self.table_name = "post_histories"
-  include Historiographer::History
-end
-
-class Comment < ActiveRecord::Base
-  include Historiographer
-  belongs_to :post
-  belongs_to :author
-end
-
-class CommentHistory < ActiveRecord::Base
-  self.table_name = "comment_histories"
-  include Historiographer::History
-end
-
-class SafePost < ActiveRecord::Base
-  include Historiographer::Safe
-  acts_as_paranoid
-end
-
-class SafePostHistory < ActiveRecord::Base
-  self.table_name = "safe_post_histories"
-  include Historiographer::History
-end
-
-class SilentPost < ActiveRecord::Base
-  include Historiographer::Silent
-end
-
-class SilentPostHistory < ActiveRecord::Base
-  self.table_name = "silent_post_histories"
-  include Historiographer::History
-end
-
-class Author < ActiveRecord::Base
-  include Historiographer
-  has_many :comments
-  has_many :posts
-end
-
-class AuthorHistory < ActiveRecord::Base
-  include Historiographer::History
-  self.table_name = "author_histories"
-end
-
-class User < ActiveRecord::Base
-end
-
-class ThingWithCompoundIndex < ActiveRecord::Base
-  include Historiographer
-end
-
-class ThingWithCompoundIndexHistory < ActiveRecord::Base
-  include Historiographer::History
-  self.table_name = "thing_with_compound_index_histories"
-end
-
-class ThingWithoutHistory < ActiveRecord::Base
-end
-
-class MLModel < ActiveRecord::Base
-  self.table_name = "ml_models"
-  self.inheritance_column = :model_type
-  include Historiographer
-
-  has_one :dataset
-end
-
-class MLModelHistory < ActiveRecord::Base
-  include Historiographer::History
-  self.table_name = "ml_model_histories"
-end
-
-class XGBoost < MLModel
-  self.inheritance_column = :model_type
-  self.table_name = "ml_models"
-  include Historiographer
-end
-
-class XGBoostHistory < ActiveRecord::Base
-  include Historiographer::History
-  self.table_name = "ml_model_histories"
-end
-
-class Dataset < ActiveRecord::Base
-  include Historiographer
-  self.table_name = "datasets"
-
-  belongs_to :ml_model, class_name: "MLModel"
-end
-
-class DatasetHistory < ActiveRecord::Base
-  include Historiographer::History
-  self.table_name = "dataset_histories"
-end
-
-module EasyML
-  class Column < ActiveRecord::Base
-    self.table_name = "easy_ml_columns"
-    self.inheritance_column = :column_type
-    include Historiographer
-  end
-
-  class EncryptedColumn < Column
-    include Historiographer
-
-    def encrypted?
-      true
-    end
-  end
-
-  class ColumnHistory < ActiveRecord::Base
-    self.inheritance_column = :column_type
-    self.table_name = "easy_ml_column_histories"
-    include Historiographer::History
-  end
-
-  class EncryptedColumnHistory < ActiveRecord::Base
-    self.inheritance_column = :column_type
-    self.table_name = "easy_ml_column_histories"
-    include Historiographer::History
-  end
-end
-
-
 describe Historiographer do
   before(:each) do
     @now = Timecop.freeze
@@ -789,15 +624,24 @@ describe Historiographer do
       snapshot_comment = snapshot_post.comments.first
       expect(snapshot_comment.body).to eq comment.body
       expect(snapshot_comment.post_id).to eq post.id
-      expect(snapshot_comment.class.name).to eq "CommentHistory"
+      expect(snapshot_comment.class.name.to_s).to eq "CommentHistory"
 
       snapshot_author = snapshot_comment.author
       expect(snapshot_author.full_name).to eq author.full_name
-      expect(snapshot_author.class.name).to eq "AuthorHistory"
+      expect(snapshot_author.class.name.to_s).to eq "AuthorHistory"
 
       # Snapshots do not allow change
       expect(snapshot_post.update(title: "My title")).to eq false
       expect(snapshot_post.reload.title).to eq post.title
+    end
+
+    it "allows override of methods on history class" do
+      post.snapshot
+      expect(post.latest_snapshot.locked_value).to eq "My Great Post v100"
+      expect(post.locked_value).to eq "My Great Post v1"
+
+      expect(post.complex_lookup).to eq "Here is a complicated value, it is: My Great Post v1 And another: Title: Post 1"
+      expect(post.latest_snapshot.complex_lookup).to eq "Here is a complicated value, it is: My Great Post v100 And another: Title: Post 1"
     end
 
     it "returns the latest snapshot" do
@@ -828,11 +672,11 @@ describe Historiographer do
       expect(snapshot_post.comments.count).to eq 1
       expect(snapshot_comment.body).to eq "Sorry man, didn't mean to post that"
       expect(snapshot_comment.post_id).to eq post.id
-      expect(snapshot_comment.class.name).to eq "CommentHistory"
+      expect(snapshot_comment.class.name.to_s).to eq "CommentHistory"
 
       snapshot_author = snapshot_comment.author
       expect(snapshot_author.full_name).to eq author.full_name
-      expect(snapshot_author.class.name).to eq "AuthorHistory"
+      expect(snapshot_author.class.name.to_s).to eq "AuthorHistory"
 
       # Snapshots do not allow change
       expect(snapshot_post.update(title: "My title")).to eq false

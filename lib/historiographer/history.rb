@@ -61,7 +61,7 @@ module Historiographer
     extend ActiveSupport::Concern
 
     included do |base|
-      clear_validators!
+      clear_validators! if respond_to?(:clear_validators!)
       #
       # A History class (e.g. RetailerProductHistory) will gain
       # access to a current scope, returning
@@ -94,6 +94,7 @@ module Historiographer
 
       # Store the original class for method delegation
       class_variable_set(:@@original_class, foreign_class)
+      class_variable_set(:@@method_map, {})
 
       # Add method_added hook to the original class
       foreign_class.singleton_class.class_eval do
@@ -102,7 +103,6 @@ module Historiographer
           alias_method :original_method_added, :method_added
         end
 
-        method_map = Hash.new(0)
         define_method(:method_added) do |method_name|
           # Skip if we're already in the process of defining a method
           return if Thread.current[:defining_historiographer_method]
@@ -121,6 +121,7 @@ module Historiographer
             return if foreign_class.history_class.method_defined?(method_name)
 
             # Define the method in the history class
+            foreign_class.history_class.set_method_map(method_name, false)
             foreign_class.history_class.class_eval do
               define_method(method_name) do |*args, &block|
                 forward_method(method_name, *args, &block)
@@ -239,9 +240,30 @@ module Historiographer
         define_history_association(association)
       end
 
+      def snapshot
+        raise "Cannot snapshot a history model!"
+      end
+
     end
 
     class_methods do
+      def method_added(method_name)
+        set_method_map(method_name, true)
+      end
+
+      def set_method_map(method_name, is_overridden)
+        mm = method_map
+        mm[method_name.to_sym] = is_overridden
+        class_variable_set(:@@method_map, mm)
+      end
+
+      def method_map
+        unless class_variable_defined?(:@@method_map)
+          class_variable_set(:@@method_map, {})
+        end
+        class_variable_get(:@@method_map) || {}
+      end
+
       def original_class
         unless class_variable_defined?(:@@original_class)
           class_variable_set(:@@original_class, self.name.gsub(/History$/, '').constantize)
@@ -255,38 +277,38 @@ module Historiographer
           association = original_class.reflect_on_association(association)
         end
         assoc_name = association.name
+        assoc_module = association.active_record.module_parent
         assoc_history_class_name = "#{association.class_name}History"
-        assoc_foreign_key = association.foreign_key
 
-        # Skip if the association is already defined
-        return if method_defined?(assoc_name)
+        begin
+          assoc_module.const_get(assoc_history_class_name)
+          assoc_history_class_name = "#{assoc_module}::#{assoc_history_class_name}" unless assoc_history_class_name.match?(Regexp.new("#{assoc_module}::"))
+        rescue
+        end
+
+        assoc_foreign_key = association.foreign_key
 
         # Skip through associations to history classes to avoid infinite loops
         return if association.class_name.end_with?('History')
 
-        # We're writing a belongs_to
-        # The dataset belongs_to the datasource
-        # dataset#datasource_id => datasource.id
-        # 
-        # For the history class, we're writing a belongs_to
-        # the DatasetHistory belongs_to the DatasourceHistory
-        # dataset_history#datasource_id => datasource_history.easy_ml_datasource_id
-        #
-        # The missing piece for us here is whatever DatasourceHistory would call easy_ml_datasource_id (history foreign key?)
+        # Always use the history class if it exists
+        assoc_class = assoc_history_class_name.safe_constantize || OpenStruct.new(name: association.class_name)
+        assoc_class_name = assoc_class.name
+
+        # Define the scope to filter by snapshot_id for history associations
+        scope = if assoc_class_name.match?(/History/)
+                  ->(history_instance) { where(snapshot_id: history_instance.snapshot_id) }
+                else
+                  ->(history_instance) { all }
+                end
 
         case association.macro
         when :belongs_to
-          belongs_to assoc_name, ->(history_instance) {
-            where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key
+          belongs_to assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key
         when :has_one
-          has_one assoc_name, ->(history_instance) {
-            where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+          has_one assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
         when :has_many
-          has_many assoc_name, ->(history_instance) {
-            where(snapshot_id: history_instance.snapshot_id)
-          }, class_name: assoc_history_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+          has_many assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
         end
       end
       #
@@ -331,11 +353,52 @@ module Historiographer
 
       instance = original_class.find_or_initialize_by(original_class.primary_key => attrs[original_class.primary_key])
       instance.assign_attributes(attrs.except(*cannot_keep_cols))
+
+      # Filter out any methods that are not overridden on the history class
+      history_methods = self.class.instance_methods(false)
+      history_class_location = Module.const_source_location(self.class.name).first
+      history_methods.select! do |method| 
+        self.class.instance_method(method).source_location.first == history_class_location
+      end
+
+      history_methods.each do |method_name|
+        instance.singleton_class.class_eval do 
+          define_method(method_name) do |*args, &block|
+            history_instance = instance.instance_variable_get(:@_history_instance)
+            history_instance.send(method_name, *args, &block)
+          end
+        end
+      end
+
+      # For each association in the history class
+      self.class.reflect_on_all_associations.each do |reflection|
+        # Define a method that forwards to the history association
+        instance.singleton_class.class_eval do
+          define_method(reflection.name) do |*args, &block|
+            history_instance = instance.instance_variable_get(:@_history_instance)
+            history_instance.send(reflection.name, *args, &block)
+          end
+        end
+      end
+
+      # Override class method to return history class
+      instance.singleton_class.class_eval do
+        define_method(:class) do
+          history_instance = instance.instance_variable_get(:@_history_instance)
+          history_instance.class
+        end
+      end
+
+      instance.instance_variable_set(:@_history_instance, self)
       @dummy_instance = instance
     end
 
     def forward_method(method_name, *args, &block)
-      dummy_instance.send(method_name, *args, &block)
+      if method_name == :class || method_name == 'class'
+        self.class
+      else
+        dummy_instance.send(method_name, *args, &block)
+      end
     end
   end
 end
