@@ -216,21 +216,25 @@ module Historiographer
     base.singleton_class.prepend(Module.new do
       def belongs_to(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
 
       def has_one(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
 
       def has_many(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
 
       def has_and_belongs_to_many(name, scope = nil, **options, &extension)
         super
+        return if is_history_class?
         history_class.define_history_association(name)
       end
     end)

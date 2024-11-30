@@ -4,6 +4,55 @@ ENV["RAILS_ENV"] = "test"
 require_relative "../init.rb"
 require "ostruct"
 require "factory_bot"
+require "zeitwerk"
+
+# Add custom inflections for test environment
+ActiveSupport::Inflector.inflections(:en) do |inflect|
+  inflect.acronym 'XGBoost'
+  inflect.acronym 'ML'
+  inflect.acronym 'EasyML'
+end
+
+# Set up autoloading
+loader = Zeitwerk::Loader.new
+loader.push_dir(File.join(File.dirname(__FILE__), 'models'))
+
+# Configure Zeitwerk inflector with a custom inflection method
+class CustomInflector < Zeitwerk::Inflector
+  def camelize(basename, abspath)
+    case basename
+    when 'xgboost'
+      'XGBoost'
+    when 'xgboost_history'
+      'XGBoostHistory'
+    when /\Aeasy_ml\z/
+      'EasyML'
+    when /\Aml_model\z/
+      'MLModel'
+    else
+      super
+    end
+  end
+end
+
+loader.inflector = CustomInflector.new
+loader.setup
+
+# Enable Rails-like constant lookup
+module Rails
+  def self.root
+    Pathname.new(File.join(File.dirname(__FILE__), '..'))
+  end
+
+  def self.application
+    OpenStruct.new(
+      config: OpenStruct.new(
+        eager_load_namespaces: [],
+        autoloader: loader
+      )
+    )
+  end
+end
 
 FactoryBot.definition_file_paths = %w{./factories ./spec/factories}
 FactoryBot.find_definitions
