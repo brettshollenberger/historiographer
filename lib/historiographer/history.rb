@@ -69,17 +69,6 @@ module Historiographer
       #
       scope :current, -> { where(history_ended_at: nil).order(id: :desc) }
 
-      #
-      # A History class will be linked to the user
-      # that made the changes.
-      #
-      # E.g.
-      #
-      # RetailerProductHistory.first.user
-      #
-      # To use histories, a user class must be defined.
-      #
-      belongs_to :user, foreign_key: :history_user_id
 
       # 
       # Historiographer is opinionated about how History classes
@@ -95,6 +84,20 @@ module Historiographer
       # Store the original class for method delegation
       class_variable_set(:@@original_class, foreign_class)
       class_variable_set(:@@method_map, {})
+
+      #
+      # A History class will be linked to the user
+      # that made the changes.
+      #
+      # E.g.
+      #
+      # RetailerProductHistory.first.user
+      #
+      # To use histories, a user class must be defined.
+      #
+      unless foreign_class.ancestors.include?(Historiographer::Silent)
+        belongs_to :user, foreign_key: :history_user_id
+      end
 
       # Add method_added hook to the original class
       foreign_class.singleton_class.class_eval do
