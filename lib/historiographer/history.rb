@@ -322,6 +322,7 @@ module Historiographer
           has_many assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
         end
       end
+
       #
       # The foreign key to the primary class.
       #
@@ -354,14 +355,20 @@ module Historiographer
     def dummy_instance
       return @dummy_instance if @dummy_instance
 
+      # Only exclude history-specific columns
       cannot_keep_cols = %w(history_started_at history_ended_at history_user_id snapshot_id)
-      cannot_keep_cols += [self.class.inheritance_column.to_sym] if self.original_class.sti_enabled?
       cannot_keep_cols += [self.class.history_foreign_key] 
       cannot_keep_cols.map!(&:to_s)
 
       attrs = attributes.clone
       attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
 
+      if original_class.sti_enabled?
+        # Remove History suffix from type if present
+        attrs[original_class.inheritance_column] = attrs[original_class.inheritance_column]&.gsub(/History$/, '')
+      end
+
+      # Create instance with all attributes except history-specific ones
       instance = original_class.instantiate(attrs.except(*cannot_keep_cols))
 
       if instance.valid?
@@ -373,7 +380,7 @@ module Historiographer
 
       # Filter out any methods that are not overridden on the history class
       history_methods = self.class.instance_methods(false)
-      history_class_location = Module.const_source_location(self.class.name).first
+      history_class_location = Module.const_source_location(self.class.name).first 
       history_methods.select! do |method| 
         self.class.instance_method(method).source_location.first == history_class_location
       end
