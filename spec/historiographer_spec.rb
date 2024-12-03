@@ -603,7 +603,6 @@ describe Historiographer do
       post_history.destroy
       expect(post_history.reload.title).to eq "Post 1"
     end
-
   end
 
   describe 'Snapshots' do

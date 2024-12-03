@@ -69,17 +69,6 @@ module Historiographer
       #
       scope :current, -> { where(history_ended_at: nil).order(id: :desc) }
 
-      #
-      # A History class will be linked to the user
-      # that made the changes.
-      #
-      # E.g.
-      #
-      # RetailerProductHistory.first.user
-      #
-      # To use histories, a user class must be defined.
-      #
-      belongs_to :user, foreign_key: :history_user_id
 
       # 
       # Historiographer is opinionated about how History classes
@@ -95,6 +84,20 @@ module Historiographer
       # Store the original class for method delegation
       class_variable_set(:@@original_class, foreign_class)
       class_variable_set(:@@method_map, {})
+
+      #
+      # A History class will be linked to the user
+      # that made the changes.
+      #
+      # E.g.
+      #
+      # RetailerProductHistory.first.user
+      #
+      # To use histories, a user class must be defined.
+      #
+      unless foreign_class.ancestors.include?(Historiographer::Silent)
+        belongs_to :user, foreign_key: :history_user_id
+      end
 
       # Add method_added hook to the original class
       foreign_class.singleton_class.class_eval do
@@ -244,9 +247,17 @@ module Historiographer
         raise "Cannot snapshot a history model!"
       end
 
+      def is_history_class?
+        true
+      end
+
     end
 
     class_methods do
+      def is_history_class?
+        true
+      end
+
       def method_added(method_name)
         set_method_map(method_name, true)
       end
@@ -311,6 +322,7 @@ module Historiographer
           has_many assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
         end
       end
+
       #
       # The foreign key to the primary class.
       #
@@ -343,20 +355,32 @@ module Historiographer
     def dummy_instance
       return @dummy_instance if @dummy_instance
 
+      # Only exclude history-specific columns
       cannot_keep_cols = %w(history_started_at history_ended_at history_user_id snapshot_id)
-      cannot_keep_cols += [self.class.inheritance_column.to_sym] if self.original_class.sti_enabled?
       cannot_keep_cols += [self.class.history_foreign_key] 
       cannot_keep_cols.map!(&:to_s)
 
       attrs = attributes.clone
       attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
 
-      instance = original_class.find_or_initialize_by(original_class.primary_key => attrs[original_class.primary_key])
-      instance.assign_attributes(attrs.except(*cannot_keep_cols))
+      if original_class.sti_enabled?
+        # Remove History suffix from type if present
+        attrs[original_class.inheritance_column] = attrs[original_class.inheritance_column]&.gsub(/History$/, '')
+      end
+
+      # Create instance with all attributes except history-specific ones
+      instance = original_class.instantiate(attrs.except(*cannot_keep_cols))
+
+      if instance.valid?
+        if instance.send(original_class.primary_key).present?
+          instance.run_callbacks(:find)
+        end
+        instance.run_callbacks(:initialize)
+      end
 
       # Filter out any methods that are not overridden on the history class
       history_methods = self.class.instance_methods(false)
-      history_class_location = Module.const_source_location(self.class.name).first
+      history_class_location = Module.const_source_location(self.class.name).first 
       history_methods.select! do |method| 
         self.class.instance_method(method).source_location.first == history_class_location
       end
