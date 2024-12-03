@@ -247,9 +247,17 @@ module Historiographer
         raise "Cannot snapshot a history model!"
       end
 
+      def is_history_class?
+        true
+      end
+
     end
 
     class_methods do
+      def is_history_class?
+        true
+      end
+
       def method_added(method_name)
         set_method_map(method_name, true)
       end
@@ -354,8 +362,14 @@ module Historiographer
       attrs = attributes.clone
       attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
 
-      instance = original_class.find_or_initialize_by(original_class.primary_key => attrs[original_class.primary_key])
-      instance.assign_attributes(attrs.except(*cannot_keep_cols))
+      instance = original_class.instantiate(attrs.except(*cannot_keep_cols))
+
+      if instance.valid?
+        if instance.send(original_class.primary_key).present?
+          instance.run_callbacks(:find)
+        end
+        instance.run_callbacks(:initialize)
+      end
 
       # Filter out any methods that are not overridden on the history class
       history_methods = self.class.instance_methods(false)
