@@ -133,7 +133,7 @@ module Historiographer
         end
       end
 
-      foreign_class.columns.map(&:name).each do |method_name|
+      (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
         define_method(method_name) do |*args, &block|
           forward_method(method_name, *args, &block)
         end
@@ -336,12 +336,12 @@ module Historiographer
       return @dummy_instance if @dummy_instance
 
       # Only exclude history-specific columns
-      cannot_keep_cols = %w(history_started_at history_ended_at history_user_id snapshot_id)
+      cannot_keep_cols = %w(history_started_at history_ended_at history_user_id snapshot_id id)
       cannot_keep_cols += [self.class.history_foreign_key] 
       cannot_keep_cols.map!(&:to_s)
 
       attrs = attributes.clone
-      attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
+      # attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
 
       if original_class.sti_enabled?
         # Remove History suffix from type if present
@@ -368,6 +368,7 @@ module Historiographer
       history_methods.select! do |method| 
         self.class.instance_method(method).source_location.first == history_class_location
       end
+      history_methods += [:is_history_class?]
 
       history_methods.each do |method_name|
         instance.singleton_class.class_eval do 
@@ -400,11 +401,7 @@ module Historiographer
     end
 
     def forward_method(method_name, *args, &block)
-      if method_name == :class || method_name == 'class'
-        self.class
-      else
-        dummy_instance.send(method_name, *args, &block)
-      end
+      dummy_instance.send(method_name, *args, &block)
     end
   end
 end
