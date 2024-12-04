@@ -366,23 +366,6 @@ module Historiographer
       raise HistoryUserIdMissingError, 'history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_user'
     end
 
-    def list_callbacks(klass)
-      callbacks = {}
-
-      [:create, :update, :save, :destroy, :validation].each do |callback_type|
-        chain = klass.send("_#{callback_type}_callbacks")
-        callbacks[callback_type] = chain.map do |callback|
-          {
-            name: callback.filter,
-            kind: callback.kind,
-            options: callback.options
-          }
-        end
-      end
-
-      callbacks
-    end
-
     #
     # Save a record of the most recent changes, with the current
     # time as history_started_at, and the provided user as history_user_id.
