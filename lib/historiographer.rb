@@ -105,7 +105,7 @@ module Historiographer
       history_user_absent_action if history_user_id.nil?
 
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
-      current_history.update!(history_ended_at: UTC.now) if current_history.present?
+      current_history.update_columns(history_ended_at: UTC.now) if current_history.present?
 
       if respond_to?(:paranoia_destroy)
         self.history_user_id = history_user_id
@@ -115,6 +115,7 @@ module Historiographer
         destroy_without_history
         @no_history = false
       end
+      true
     end
 
     alias_method :destroy, :destroy_with_history
