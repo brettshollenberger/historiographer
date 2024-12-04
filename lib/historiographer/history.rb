@@ -368,15 +368,19 @@ module Historiographer
         attrs[original_class.inheritance_column] = attrs[original_class.inheritance_column]&.gsub(/History$/, '')
       end
 
-      # Create instance with all attributes except history-specific ones
-      instance = original_class.instantiate(attrs.except(*cannot_keep_cols))
+      # Manually handle creating instance WITHOUT running find or initialize callbacks
+      # We will manually run callbacks below
+      # See: https://github.com/rails/rails/blob/95deab7b439abba23fdc4bd659116dab5dbe2606/activerecord/lib/active_record/core.rb#L487
+      #
+      attributes = original_class.attributes_builder.build_from_database(attrs.except(*cannot_keep_cols))
+      instance = original_class.allocate
 
-      if instance.valid?
-        if instance.send(original_class.primary_key).present?
-          instance.run_callbacks(:find)
-        end
-        instance.run_callbacks(:initialize)
-      end
+      # Set the internal attributes
+      instance.instance_variable_set(:@attributes, attributes)
+      instance.instance_variable_set(:@new_record, false)
+
+      # Initialize internal variables without triggering callbacks
+      instance.send(:init_internals)
 
       # Filter out any methods that are not overridden on the history class
       history_methods = self.class.instance_methods(false)
@@ -405,15 +409,13 @@ module Historiographer
         end
       end
 
-      # Override class method to return history class
-      instance.singleton_class.class_eval do
-        define_method(:class) do
-          history_instance = instance.instance_variable_get(:@_history_instance)
-          history_instance.class
-        end
-      end
-
       instance.instance_variable_set(:@_history_instance, self)
+
+      if instance.send(original_class.primary_key).present?
+        instance.run_callbacks(:find)
+      end
+      instance.run_callbacks(:initialize)
+
       @dummy_instance = instance
     end
 
