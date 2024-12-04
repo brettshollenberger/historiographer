@@ -713,6 +713,17 @@ describe Historiographer do
       expect(AuthorHistory.count).to eq 2
     end
 
+    it "runs callbacks at the appropriate time" do
+      comment
+      post.snapshot # 1 comment
+      comment2 = comment.dup
+      comment2.body = "Hello there"
+      comment2.save
+
+      post.reload
+      expect(post.comment_count).to eq 2
+      expect(post.latest_snapshot.comment_count).to eq 1
+    end
   end
 
   describe 'Single Table Inheritance' do

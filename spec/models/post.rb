@@ -5,6 +5,9 @@ class Post < ActiveRecord::Base
 
   validates :type, inclusion: { in: ['Post', 'PrivatePost', nil] }
   before_validation :set_defaults
+  after_find :set_comment_count
+
+  attr_reader :comment_count
 
   def set_defaults
     @type ||= "Post"
@@ -28,5 +31,13 @@ class Post < ActiveRecord::Base
       is: #{locked_value}
       And another: #{formatted_title}
     ).strip.gsub(/\n{2}/, " ").split(" ").join(" ")
+  end
+
+  def set_comment_count
+    comment_count
+  end
+
+  def comment_count
+    @comment_count ||= comments.count
   end
 end

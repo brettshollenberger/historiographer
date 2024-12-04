@@ -332,6 +332,10 @@ module Historiographer
       history_class = self.class.history_class
       foreign_key = history_class.history_foreign_key
 
+      attrs = attrs.stringify_keys
+      allowed_columns = self.class.columns.map(&:name)
+      attrs.select! { |k,v| allowed_columns.include?(k) }.to_h
+
       now ||= UTC.now
       attrs.merge!(foreign_key => attrs['id'], history_started_at: now, history_user_id: history_user_id)
       attrs.merge!(snapshot_id: snapshot_id) if snapshot_id.present?
@@ -343,6 +347,7 @@ module Historiographer
       end
 
       attrs = attrs.except('id')
+      attrs.stringify_keys!
 
       attrs
     end
@@ -375,9 +380,10 @@ module Historiographer
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
       if history_class.history_foreign_key.present? && history_class.present?
-        instance = history_class.new(attrs)
-        instance.save(validate: false)
-        current_history.update!(history_ended_at: now) if current_history.present?
+        result = history_class.insert_all([attrs])
+        inserted_id = result.rows.first.first if history_class.primary_key == 'id'
+        instance = history_class.find(inserted_id)
+        current_history.update_columns(history_ended_at: now) if current_history.present?
         instance
       else
         raise 'Need foreign key and history class to save history!'
