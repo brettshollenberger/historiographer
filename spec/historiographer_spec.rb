@@ -713,7 +713,7 @@ describe Historiographer do
       expect(AuthorHistory.count).to eq 2
     end
 
-    it "runs callbacks at the appropriate time", :focus do
+    it "runs callbacks at the appropriate time" do
       comment
       post.snapshot # 1 comment
       comment2 = comment.dup

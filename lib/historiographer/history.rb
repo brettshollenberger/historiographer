@@ -83,7 +83,6 @@ module Historiographer
 
       # Store the original class for method delegation
       class_variable_set(:@@original_class, foreign_class)
-      class_variable_set(:@@method_map, {})
 
       #
       # A History class will be linked to the user
@@ -123,8 +122,6 @@ module Historiographer
             # Skip if we've already defined this method in the history class
             return if foreign_class.history_class.method_defined?(method_name)
 
-            # Define the method in the history class
-            foreign_class.history_class.set_method_map(method_name, false)
             foreign_class.history_class.class_eval do
               define_method(method_name) do |*args, &block|
                 forward_method(method_name, *args, &block)
@@ -256,23 +253,6 @@ module Historiographer
     class_methods do
       def is_history_class?
         true
-      end
-
-      def method_added(method_name)
-        set_method_map(method_name, true)
-      end
-
-      def set_method_map(method_name, is_overridden)
-        mm = method_map
-        mm[method_name.to_sym] = is_overridden
-        class_variable_set(:@@method_map, mm)
-      end
-
-      def method_map
-        unless class_variable_defined?(:@@method_map)
-          class_variable_set(:@@method_map, {})
-        end
-        class_variable_get(:@@method_map) || {}
       end
 
       def original_class
