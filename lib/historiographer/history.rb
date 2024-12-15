@@ -123,8 +123,8 @@ module Historiographer
             return if foreign_class.history_class.method_defined?(method_name)
 
             foreign_class.history_class.class_eval do
-              define_method(method_name) do |*args, &block|
-                forward_method(method_name, *args, &block)
+              define_method(method_name) do |*args, **kwargs, &block|
+                forward_method(method_name, *args, **kwargs, &block)
               end
             end
           ensure
@@ -134,16 +134,16 @@ module Historiographer
       end
 
       (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
-        define_method(method_name) do |*args, &block|
-          forward_method(method_name, *args, &block)
+        define_method(method_name) do |*args, **kwargs, &block|
+          forward_method(method_name, *args, **kwargs, &block)
         end
       end
 
       # Add method_missing for any methods we might have missed
-      def method_missing(method_name, *args, &block)
+      def method_missing(method_name, *args, **kwargs, &block)
         original_class = self.class.class_variable_get(:@@original_class)
         if original_class.method_defined?(method_name)
-          forward_method(method_name, *args, &block)
+          forward_method(method_name, *args, **kwargs, &block)
         else
           super
         end
@@ -400,8 +400,8 @@ module Historiographer
       @dummy_instance = instance
     end
 
-    def forward_method(method_name, *args, &block)
-      dummy_instance.send(method_name, *args, &block)
+    def forward_method(method_name, *args, **kwargs, &block)
+      dummy_instance.send(method_name, *args, **kwargs, &block)
     end
   end
 end
