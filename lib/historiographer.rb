@@ -306,6 +306,9 @@ module Historiographer
         # Recursively snapshot associations, avoiding infinite loops
         self.class.reflect_on_all_associations.each do |association|
           associated_records = send(association.name)&.reload
+          if associated_records.respond_to?(:order)
+            associated_records = associated_records.order(id: :asc)
+          end
           Array(associated_records).each do |record|
             model_name = record.class.name
             record_id = record.id
