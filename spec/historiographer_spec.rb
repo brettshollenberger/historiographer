@@ -827,7 +827,7 @@ describe Historiographer do
     end
 
     it "uses class-level snapshot_only mode" do
-      class Post < ActiveRecord::Base
+      class Post < ApplicationRecord
         historiographer_mode :snapshot_only
       end
 
@@ -854,7 +854,7 @@ describe Historiographer do
 
       Timecop.return
 
-      class Post < ActiveRecord::Base
+      class Post < ApplicationRecord
         historiographer_mode nil
       end
     end

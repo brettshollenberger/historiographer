@@ -1,4 +1,6 @@
-class Post < ActiveRecord::Base
+require_relative 'application_record'
+
+class Post < ApplicationRecord
   include Historiographer
   acts_as_paranoid
   has_many :comments
