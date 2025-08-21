@@ -35,6 +35,8 @@ Gem::Specification.new do |s|
     "historiographer-4.1.14.gem",
     "historiographer.gemspec",
     "init.rb",
+    "instructions/implementation.md",
+    "instructions/todo.md",
     "lib/historiographer.rb",
     "lib/historiographer/configuration.rb",
     "lib/historiographer/history.rb",
