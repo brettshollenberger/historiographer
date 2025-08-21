@@ -1,3 +1,3 @@
 module Historiographer
-  VERSION = "4.1.14"
+  VERSION = "4.1.16"
 end
