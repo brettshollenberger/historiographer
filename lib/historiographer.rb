@@ -381,7 +381,24 @@ module Historiographer
         
         # Check if the insertion was successful
         if result.rows.empty?
-          raise HistoryInsertionError, "Failed to insert history record for #{self.class.name} ##{id}. This can happen due to database constraints or validation failures."
+          # insert_all returned empty rows, likely due to a duplicate/conflict
+          # Try to find the existing record that prevented insertion
+          foreign_key = history_class.history_foreign_key
+          existing_history = history_class.where(
+            foreign_key => attrs[foreign_key],
+            history_started_at: attrs['history_started_at']
+          ).first
+          
+          if existing_history
+            # A duplicate history already exists (race condition or retry)
+            # This is acceptable - return the existing history
+            Rails.logger.warn("Duplicate history detected for #{self.class.name} ##{id} at #{attrs['history_started_at']}. Using existing history record ##{existing_history.id}.") if Rails.logger
+            current_history.update_columns(history_ended_at: now) if current_history.present?
+            return existing_history
+          else
+            # No rows inserted and can't find an existing record - this is unexpected
+            raise HistoryInsertionError, "Failed to insert history record for #{self.class.name} ##{id}, and no existing history was found. This may indicate a database constraint preventing insertion."
+          end
         end
         
         inserted_id = result.rows.first.first if history_class.primary_key == 'id'

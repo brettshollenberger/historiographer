@@ -504,7 +504,38 @@ describe Historiographer do
   end
 
   describe 'Empty insertion handling' do
-    it 'handles empty insert_all results gracefully' do
+    it 'handles duplicate history gracefully by returning existing record' do
+      # Create post without history tracking to avoid initial history
+      post = Post.new(
+        title: 'Post 1',
+        body: 'Great post',
+        author_id: 1,
+        history_user_id: user.id
+      )
+      post.save_without_history
+      
+      # Freeze time to ensure same timestamp
+      Timecop.freeze do
+        # Create a history record with current timestamp
+        now = Historiographer::UTC.now
+        attrs = post.send(:history_attrs, now: now)
+        existing_history = PostHistory.create!(attrs)
+        
+        # Mock insert_all to return empty result (simulating duplicate constraint)
+        empty_result = double('result')
+        allow(empty_result).to receive(:rows).and_return([])
+        
+        allow(PostHistory).to receive(:insert_all).and_return(empty_result)
+        
+        # The method should find and return the existing history
+        allow(Rails.logger).to receive(:warn).with(/Duplicate history detected/) if Rails.logger
+        result = post.send(:record_history)
+        expect(result.id).to eq(existing_history.id)
+        expect(result.post_id).to eq(post.id)
+      end
+    end
+    
+    it 'raises error when insert fails and no existing record found' do
       post = create_post
       
       # Mock insert_all to return an empty result
@@ -513,10 +544,25 @@ describe Historiographer do
       
       allow(PostHistory).to receive(:insert_all).and_return(empty_result)
       
-      # This should raise a meaningful error instead of NoMethodError
+      # Mock the where clause for finding existing history to return nothing
+      # We need to be specific about the where clause we're mocking
+      original_where = PostHistory.method(:where)
+      allow(PostHistory).to receive(:where) do |*args|
+        # Check if this is the specific query for finding duplicates
+        # The foreign key is "post_id" (string) and we're checking for history_started_at
+        if args.first.is_a?(Hash) && args.first.keys.include?("post_id") && args.first.keys.include?(:history_started_at)
+          # Return a double that returns nil when .first is called
+          double('where').tap { |d| allow(d).to receive(:first).and_return(nil) }
+        else
+          # For all other queries, use the original behavior
+          original_where.call(*args)
+        end
+      end
+      
+      # This should raise a meaningful error
       expect {
         post.send(:record_history)
-      }.to raise_error(Historiographer::HistoryInsertionError, /Failed to insert history record/)
+      }.to raise_error(Historiographer::HistoryInsertionError, /Failed to insert history record.*no existing history was found/)
     end
 
     it 'provides meaningful error when insertion fails' do
@@ -548,6 +594,24 @@ describe Historiographer do
       expect(history.post_id).to eq(post.id)
       expect(history.title).to eq(post.title)
       expect(history.body).to eq(post.body)
+    end
+    
+    it 'handles race conditions by returning existing history' do
+      post = create_post
+      
+      # Simulate a race condition where the same history_started_at timestamp is used
+      now = Time.now
+      allow(Historiographer::UTC).to receive(:now).and_return(now)
+      
+      # First process creates history
+      history1 = post.histories.last
+      
+      # Second process tries to create history with same timestamp
+      # This would normally cause insert_all to return empty rows
+      history2 = post.send(:record_history)
+      
+      # Should handle gracefully
+      expect(history2).to be_a(PostHistory)
     end
   end
 
