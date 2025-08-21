@@ -78,6 +78,7 @@ module Historiographer
   extend ActiveSupport::Concern
 
   class HistoryUserIdMissingError < StandardError; end
+  class HistoryInsertionError < StandardError; end
 
   UTC = Time.now.in_time_zone('UTC').time_zone
 
@@ -377,6 +378,12 @@ module Historiographer
 
       if history_class.history_foreign_key.present? && history_class.present?
         result = history_class.insert_all([attrs])
+        
+        # Check if the insertion was successful
+        if result.rows.empty?
+          raise HistoryInsertionError, "Failed to insert history record for #{self.class.name} ##{id}. This can happen due to database constraints or validation failures."
+        end
+        
         inserted_id = result.rows.first.first if history_class.primary_key == 'id'
         instance = history_class.find(inserted_id)
         current_history.update_columns(history_ended_at: now) if current_history.present?

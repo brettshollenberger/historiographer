@@ -503,6 +503,54 @@ describe Historiographer do
     end
   end
 
+  describe 'Empty insertion handling' do
+    it 'handles empty insert_all results gracefully' do
+      post = create_post
+      
+      # Mock insert_all to return an empty result
+      empty_result = double('result')
+      allow(empty_result).to receive(:rows).and_return([])
+      
+      allow(PostHistory).to receive(:insert_all).and_return(empty_result)
+      
+      # This should raise a meaningful error instead of NoMethodError
+      expect {
+        post.send(:record_history)
+      }.to raise_error(Historiographer::HistoryInsertionError, /Failed to insert history record/)
+    end
+
+    it 'provides meaningful error when insertion fails' do
+      post = create_post
+      
+      # Mock insert_all to simulate a database-level failure
+      # This could happen due to various reasons:
+      # - Database is read-only
+      # - Connection issues
+      # - Constraint violations that prevent insertion
+      allow(PostHistory).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "PG::ReadOnlySqlTransaction: ERROR: cannot execute INSERT in a read-only transaction")
+      
+      expect {
+        post.send(:record_history)
+      }.to raise_error(ActiveRecord::StatementInvalid)
+    end
+    
+    it 'successfully inserts history when everything is valid' do
+      post = create_post
+      
+      # Clear existing histories
+      PostHistory.where(post_id: post.id).destroy_all
+      
+      # Record a new history
+      history = post.send(:record_history)
+      
+      expect(history).to be_a(PostHistory)
+      expect(history).to be_persisted
+      expect(history.post_id).to eq(post.id)
+      expect(history.title).to eq(post.title)
+      expect(history.body).to eq(post.body)
+    end
+  end
+
   describe 'Scopes' do
     it 'finds current' do
       post = create_post
