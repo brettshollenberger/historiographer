@@ -317,13 +317,7 @@ module Historiographer
 
       def sti_base_class
         return @sti_base_class if @sti_base_class
-
-        base_name = name.gsub(/History$/, '')
-        base_class = base_name.constantize
-        while base_class.superclass != ActiveRecord::Base
-          base_class = base_class.superclass
-        end
-        @sti_base_class = base_class
+        @sti_base_class = original_class.base_class
       end
     end
 
