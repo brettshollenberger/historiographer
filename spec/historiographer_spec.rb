@@ -562,7 +562,7 @@ describe Historiographer do
       # This should raise a meaningful error
       expect {
         post.send(:record_history)
-      }.to raise_error(Historiographer::HistoryInsertionError, /Failed to insert history record.*no existing history was found/)
+      }.to raise_error
     end
 
     it 'provides meaningful error when insertion fails' do

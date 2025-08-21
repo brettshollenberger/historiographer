@@ -396,8 +396,7 @@ module Historiographer
             current_history.update_columns(history_ended_at: now) if current_history.present?
             return existing_history
           else
-            # No rows inserted and can't find an existing record - this is unexpected
-            raise HistoryInsertionError, "Failed to insert history record for #{self.class.name} ##{id}, and no existing history was found. This may indicate a database constraint preventing insertion."
+            history_class.create!(attrs) # This will raise the correct error since it will fail the unique constraint
           end
         end
         
