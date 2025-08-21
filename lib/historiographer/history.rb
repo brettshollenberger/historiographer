@@ -179,11 +179,6 @@ module Historiographer
         belongs_to association_name, class_name: foreign_class_name
       end
 
-      # Enable STI for history classes
-      if foreign_class.sti_enabled?
-        self.inheritance_column = 'type'
-      end
-
       # Ensure we can't destroy history records
       before_destroy { |record| raise "Cannot destroy history records" }
 
@@ -312,13 +307,9 @@ module Historiographer
         return @history_foreign_key if @history_foreign_key
 
         # CAN THIS BE TABLE OR MODEL?
-        @history_foreign_key = sti_base_class.name.singularize.foreign_key
+        @history_foreign_key = original_class.base_class.name.singularize.foreign_key
       end
 
-      def sti_base_class
-        return @sti_base_class if @sti_base_class
-        @sti_base_class = original_class.base_class
-      end
     end
 
     def original_class
@@ -337,10 +328,6 @@ module Historiographer
       attrs = attributes.clone
       # attrs[original_class.primary_key] = attrs[self.class.history_foreign_key]
 
-      if original_class.sti_enabled?
-        # Remove History suffix from type if present
-        attrs[original_class.inheritance_column] = attrs[original_class.inheritance_column]&.gsub(/History$/, '')
-      end
 
       # Manually handle creating instance WITHOUT running find or initialize callbacks
       # We will manually run callbacks below

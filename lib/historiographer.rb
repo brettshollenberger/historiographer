@@ -190,9 +190,6 @@ module Historiographer
       
       history_class_initializer = Class.new(ActiveRecord::Base) do
         self.table_name = "#{base_table}_histories"
-        
-        # Handle STI properly
-        self.inheritance_column = base.inheritance_column if base.sti_enabled?
       end
 
       # Split the class name into module parts and the actual class name
@@ -295,10 +292,11 @@ module Historiographer
         existing_snapshot = history_class.where(foreign_key => attrs[primary_key], snapshot_id: snapshot_id)
         return if existing_snapshot.present?
 
-        null_snapshot = history_class.where(foreign_key => attrs[primary_key], snapshot_id: nil)
+        null_snapshot = history_class.where(foreign_key => attrs[primary_key], snapshot_id: nil).first
         snapshot = nil
         if null_snapshot.present?
-          snapshot = null_snapshot.update(snapshot_id: snapshot_id)
+          null_snapshot.update(snapshot_id: snapshot_id)
+          snapshot = null_snapshot
         else
           snapshot = record_history(snapshot_id: snapshot_id)
         end
@@ -343,12 +341,6 @@ module Historiographer
       now ||= UTC.now
       attrs.merge!(foreign_key => attrs['id'], history_started_at: now, history_user_id: history_user_id)
       attrs.merge!(snapshot_id: snapshot_id) if snapshot_id.present?
-
-      # For STI, ensure we use the correct history class type
-      if self.class.sti_enabled?
-        type_column = self.class.inheritance_column
-        attrs[type_column] = "#{self.class.name}History"
-      end
 
       attrs = attrs.except('id')
       attrs.stringify_keys!
@@ -434,9 +426,6 @@ module Historiographer
       @historiographer_mode || Historiographer::Configuration.mode
     end
 
-    def sti_enabled?
-      columns.map(&:name).include?(inheritance_column)
-    end
   end
 
   def is_history_class?
