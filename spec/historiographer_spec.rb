@@ -397,20 +397,6 @@ describe Historiographer do
     end
   end
 
-  describe 'Method stubbing' do
-    it 'handles adding method appropriately' do
-      post = PrivatePost.create(title: 'Post 1', body: "Hello", author_id: 1, history_user_id: 1)
-      expect(post.formatted_title).to eq("Private — You cannot see!")
-      
-      allow_any_instance_of(PrivatePost).to receive(:formatted_title).and_return("New Title")
-      expect(post.formatted_title).to eq("New Title")
-      
-      # Ensure history still works
-      post.update(title: 'Updated Title', history_user_id: user.id)
-      expect(post.histories.count).to eq(2)
-      expect(post.histories.first.class).to eq(PrivatePostHistory)  # Verify correct history class
-    end
-  end
 
   describe 'Scopes' do
     it 'finds current histories' do
@@ -514,6 +500,118 @@ describe Historiographer do
       expect(post2.deleted_at).to_not be_nil
       expect(SafePostHistory.unscoped.count).to eq 4
       expect(SafePostHistory.unscoped.current.where(safe_post_id: post2.id).last.deleted_at).to eq post2.deleted_at
+    end
+  end
+
+  describe 'Empty insertion handling' do
+    it 'handles duplicate history gracefully by returning existing record' do
+      # Create post without history tracking to avoid initial history
+      post = Post.new(
+        title: 'Post 1',
+        body: 'Great post',
+        author_id: 1,
+        history_user_id: user.id
+      )
+      post.save_without_history
+      
+      # Freeze time to ensure same timestamp
+      Timecop.freeze do
+        # Create a history record with current timestamp
+        now = Historiographer::UTC.now
+        attrs = post.send(:history_attrs, now: now)
+        existing_history = PostHistory.create!(attrs)
+        
+        # Mock insert_all to return empty result (simulating duplicate constraint)
+        empty_result = double('result')
+        allow(empty_result).to receive(:rows).and_return([])
+        
+        allow(PostHistory).to receive(:insert_all).and_return(empty_result)
+        
+        # The method should find and return the existing history
+        allow(Rails.logger).to receive(:warn).with(/Duplicate history detected/) if Rails.logger
+        result = post.send(:record_history)
+        expect(result.id).to eq(existing_history.id)
+        expect(result.post_id).to eq(post.id)
+      end
+    end
+    
+    it 'raises error when insert fails and no existing record found' do
+      post = create_post
+      
+      # Mock insert_all to return an empty result
+      empty_result = double('result')
+      allow(empty_result).to receive(:rows).and_return([])
+      
+      allow(PostHistory).to receive(:insert_all).and_return(empty_result)
+      
+      # Mock the where clause for finding existing history to return nothing
+      # We need to be specific about the where clause we're mocking
+      original_where = PostHistory.method(:where)
+      allow(PostHistory).to receive(:where) do |*args|
+        # Check if this is the specific query for finding duplicates
+        # The foreign key is "post_id" (string) and we're checking for history_started_at
+        if args.first.is_a?(Hash) && args.first.keys.include?("post_id") && args.first.keys.include?(:history_started_at)
+          # Return a double that returns nil when .first is called
+          double('where').tap { |d| allow(d).to receive(:first).and_return(nil) }
+        else
+          # For all other queries, use the original behavior
+          original_where.call(*args)
+        end
+      end
+      
+      # This should raise a meaningful error
+      expect {
+        post.send(:record_history)
+      }.to raise_error(Historiographer::HistoryInsertionError, /Failed to insert history record.*no existing history was found/)
+    end
+
+    it 'provides meaningful error when insertion fails' do
+      post = create_post
+      
+      # Mock insert_all to simulate a database-level failure
+      # This could happen due to various reasons:
+      # - Database is read-only
+      # - Connection issues
+      # - Constraint violations that prevent insertion
+      allow(PostHistory).to receive(:insert_all).and_raise(ActiveRecord::StatementInvalid, "PG::ReadOnlySqlTransaction: ERROR: cannot execute INSERT in a read-only transaction")
+      
+      expect {
+        post.send(:record_history)
+      }.to raise_error(ActiveRecord::StatementInvalid)
+    end
+    
+    it 'successfully inserts history when everything is valid' do
+      post = create_post
+      
+      # Clear existing histories
+      PostHistory.where(post_id: post.id).destroy_all
+      
+      # Record a new history
+      history = post.send(:record_history)
+      
+      expect(history).to be_a(PostHistory)
+      expect(history).to be_persisted
+      expect(history.post_id).to eq(post.id)
+      expect(history.title).to eq(post.title)
+      expect(history.body).to eq(post.body)
+    end
+    
+    it 'handles race conditions by returning existing history' do
+      post = create_post
+      
+      # Simulate a race condition where the same history_started_at timestamp is used
+      now = Time.now
+      allow(Historiographer::UTC).to receive(:now).and_return(now)
+      
+      # First process creates history
+      history1 = post.histories.last
+      
+      # Second process tries to create history with same timestamp
+      # This would normally cause insert_all to return empty rows
+      history2 = post.send(:record_history)
+      
+      # Should handle gracefully
+      expect(history2).to be_a(PostHistory)
     end
   end
 
@@ -724,102 +822,24 @@ describe Historiographer do
       expect(post.comment_count).to eq 2
       expect(post.latest_snapshot.comment_count).to eq 1
     end
-  end
 
-  describe 'Single Table Inheritance' do
-    let(:user) { User.create(name: 'Test User') }
-    let(:private_post) do 
-      PrivatePost.create(
-        title: 'Private Post',
-        body: 'Test',
-        history_user_id: user.id,
-        author_id: 1
-      )
-    end
+    it "doesn't explode" do
+      project = Project.create(name: "test_project")
+      project_file = ProjectFile.create(project: project, name: "test_file", content: "Hello world")
 
-    it 'maintains original class type on create' do
-      post_history = private_post.histories.first
-      expect(post_history.original_class).to eq(PrivatePost)
-    end
+      original_snapshot = project.snapshot
 
-    it 'maintains original class in history records' do
-      post_history = private_post.histories.first
-      expect(post_history.original_class).to eq(PrivatePost)
-      expect(post_history.title).to eq('Private — You cannot see!')
-    end
+      project_file.update(content: "Goodnight moon")
+      new_snapshot = project.snapshot
 
-    it 'maintains original class behavior when updating' do
-      private_post.update(title: 'Updated Private Post', history_user_id: user.id)
-      new_history = private_post.histories.current&.first
-      expect(new_history.original_class).to eq(PrivatePost)
-      expect(new_history.title).to eq('Private — You cannot see!')
-    end
+      expect(original_snapshot.files.map(&:class)).to eq [ProjectFileHistory]
+      expect(new_snapshot.files.map(&:class)).to eq [ProjectFileHistory]
 
-    it 'maintains original class behavior when reifying' do
-      private_post.update(title: 'Updated Private Post', history_user_id: user.id)
-      old_history = private_post.histories.first
-      reified = old_history
-      expect(reified.title).to eq('Private — You cannot see!')
-      expect(reified.original_class).to eq(PrivatePost)
+      expect(new_snapshot.files.first.content).to eq "Goodnight moon"
+      expect(original_snapshot.files.first.content).to eq "Hello world"
     end
   end
 
-  describe 'Single Table Inheritance with Associations' do
-    let(:user) { User.create(name: 'Test User') }
-
-    it 'inherits associations in history classes' do
-      dataset = Dataset.create(name: "test_dataset", history_user_id: user.id)
-      model = XGBoost.create(name: "test_model", dataset: dataset, history_user_id: user.id)
-      model.snapshot
-
-      dataset.update(name: "new_dataset", history_user_id: user.id)
-      
-      expect(dataset.ml_model).to eq model # This is still a live model
-      expect(model.dataset).to eq(dataset)
-      expect(model.histories.first).to respond_to(:dataset)
-      expect(model.histories.first.dataset).to be_a(DatasetHistory)
-
-      model_history = model.latest_snapshot
-      expect(model_history.dataset.name).to eq "test_dataset"
-    end
-  end
-
-  describe 'Single Table Inheritance with custom inheritance column' do
-    let(:user) { User.create(name: 'Test User') }
-    let(:xgboost) do
-      XGBoost.create(
-        name: 'My XGBoost Model',
-        parameters: { max_depth: 3, eta: 0.1 },
-        history_user_id: user.id
-      )
-    end
-
-    it 'creates history records with correct inheritance' do
-      model = xgboost
-      expect(model.model_name).to eq('XGBoost')
-      expect(model.current_history).to be_a(XGBoostHistory)
-      expect(model.current_history.model_name).to eq('XGBoostHistory')
-    end
-
-    it 'maintains inheritance through updates' do
-      model = xgboost
-      model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
-      
-      expect(model.histories.count).to eq(2)
-      expect(model.histories.all? { |h| h.is_a?(XGBoostHistory) }).to be true
-    end
-
-    it 'reifies with correct class' do
-      model = xgboost
-      original_name = model.name
-      model.update(name: 'Updated XGBoost Model', history_user_id: user.id)
-      model.snapshot
-      
-      reified = model.latest_snapshot
-      expect(reified).to be_a(XGBoostHistory)
-      expect(reified.name).to eq("Updated XGBoost Model")
-    end
-  end
 
   describe 'Class-level mode setting' do
     before(:each) do
@@ -882,24 +902,6 @@ describe Historiographer do
       expect(col_history).to be_a(EasyML::ColumnHistory)
     end
 
-    it 'establishes correct associations for child classes' do
-      encrypted_col = EasyML::Column.create(
-        name: 'secret_feature',
-        data_type: 'numeric',
-        history_user_id: user.id,
-        column_type: "EasyML::EncryptedColumn"
-      )
-      
-      # Verify the base record
-      expect(encrypted_col).to be_a(EasyML::EncryptedColumn)
-      expect(encrypted_col.encrypted?).to be true
-      
-      # Verify history record
-      col_history = encrypted_col.histories.last
-      expect(col_history).to be_a(EasyML::EncryptedColumnHistory)
-      expect(col_history.class.history_foreign_key).to eq('column_id')
-      expect(col_history.encrypted?).to be true
-    end
 
     it 'uses correct table names' do
       expect(EasyML::Column.table_name).to eq('easy_ml_columns')

@@ -195,6 +195,50 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_19_000000) do
     t.index ["type"], name: "index_posts_on_type"
   end
 
+  create_table "project_file_histories", force: :cascade do |t|
+    t.integer "project_file_id", null: false
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_project_file_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_project_file_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_project_file_histories_on_history_user_id"
+    t.index ["project_file_id"], name: "index_project_file_histories_on_project_file_id"
+    t.index ["snapshot_id"], name: "index_project_file_histories_on_snapshot_id"
+  end
+
+  create_table "project_files", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "project_histories", force: :cascade do |t|
+    t.integer "project_id", null: false
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_project_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_project_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_project_histories_on_history_user_id"
+    t.index ["project_id"], name: "index_project_histories_on_project_id"
+    t.index ["snapshot_id"], name: "index_project_histories_on_snapshot_id"
+  end
+
+  create_table "projects", force: :cascade do |t|
+    t.string "name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "safe_post_histories", force: :cascade do |t|
     t.integer "safe_post_id", null: false
     t.string "title", null: false
