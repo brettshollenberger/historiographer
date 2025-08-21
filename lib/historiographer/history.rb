@@ -230,6 +230,9 @@ module Historiographer
           .order('snapshot_id, history_started_at DESC, id DESC')
       }
 
+      # Track custom association methods
+      base.class_variable_set(:@@history_association_methods, [])
+      
       # Dynamically define associations on the history class
       foreign_class.reflect_on_all_associations.each do |association|
         define_history_association(association)
@@ -281,20 +284,64 @@ module Historiographer
         assoc_class = assoc_history_class_name.safe_constantize || OpenStruct.new(name: association.class_name)
         assoc_class_name = assoc_class.name
 
-        # Define the scope to filter by snapshot_id for history associations
-        scope = if assoc_class_name.match?(/History/)
-                  ->(history_instance) { where(snapshot_id: history_instance.snapshot_id) }
-                else
-                  ->(history_instance) { all }
-                end
-
         case association.macro
         when :belongs_to
-          belongs_to assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: assoc_foreign_key
+          # For belongs_to associations, if the target is a history class, we need special handling
+          if assoc_class_name.match?(/History/)
+            # Override the association method to filter by snapshot_id
+            # The history class uses <model>_id as the foreign key (e.g., author_id for AuthorHistory)
+            history_fk = association.class_name.gsub(/History$/, '').underscore + '_id'
+            
+            # Track this custom method
+            methods_list = class_variable_get(:@@history_association_methods) rescue []
+            methods_list << assoc_name
+            class_variable_set(:@@history_association_methods, methods_list)
+            
+            define_method(assoc_name) do
+              return nil unless self[assoc_foreign_key]
+              assoc_class.where(
+                history_fk => self[assoc_foreign_key],
+                snapshot_id: self.snapshot_id
+              ).first
+            end
+          else
+            belongs_to assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key
+          end
         when :has_one
-          has_one assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+          if assoc_class_name.match?(/History/)
+            hfk = history_foreign_key
+            
+            # Track this custom method
+            methods_list = class_variable_get(:@@history_association_methods) rescue []
+            methods_list << assoc_name
+            class_variable_set(:@@history_association_methods, methods_list)
+            
+            define_method(assoc_name) do
+              assoc_class.where(
+                assoc_foreign_key => self[hfk],
+                snapshot_id: self.snapshot_id
+              ).first
+            end
+          else
+            has_one assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+          end
         when :has_many
-          has_many assoc_name, scope, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+          if assoc_class_name.match?(/History/)
+            hfk = history_foreign_key
+            # Track this custom method
+            methods_list = class_variable_get(:@@history_association_methods) rescue []
+            methods_list << assoc_name
+            class_variable_set(:@@history_association_methods, methods_list)
+            
+            define_method(assoc_name) do
+              assoc_class.where(
+                assoc_foreign_key => self[hfk],
+                snapshot_id: self.snapshot_id
+              )
+            end
+          else
+            has_many assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+          end
         end
       end
 
@@ -360,13 +407,19 @@ module Historiographer
         end
       end
 
-      # For each association in the history class
-      self.class.reflect_on_all_associations.each do |reflection|
+      # For each association in the history class (including custom methods)
+      associations_to_forward = self.class.reflect_on_all_associations.map(&:name)
+      
+      # Add custom association methods
+      custom_methods = self.class.class_variable_get(:@@history_association_methods) rescue []
+      associations_to_forward += custom_methods
+      
+      associations_to_forward.uniq.each do |assoc_name|
         # Define a method that forwards to the history association
         instance.singleton_class.class_eval do
-          define_method(reflection.name) do |*args, &block|
-            history_instance = instance.instance_variable_get(:@_history_instance)
-            history_instance.send(reflection.name, *args, &block)
+          define_method(assoc_name) do |*args, &block|
+            history_instance = instance_variable_get(:@_history_instance)
+            history_instance.send(assoc_name, *args, &block)
           end
         end
       end
