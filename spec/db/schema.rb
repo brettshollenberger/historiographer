@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_08_23_000000) do
+ActiveRecord::Schema[7.1].define(version: 2025_08_24_000001) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -289,6 +289,52 @@ ActiveRecord::Schema[7.1].define(version: 2025_08_23_000000) do
     t.index ["deleted_at"], name: "index_silent_posts_on_deleted_at"
     t.index ["enabled"], name: "index_silent_posts_on_enabled"
     t.index ["live_at"], name: "index_silent_posts_on_live_at"
+  end
+
+  create_table "test_article_histories", force: :cascade do |t|
+    t.integer "test_article_id", null: false
+    t.string "title"
+    t.integer "test_category_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_test_article_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_test_article_histories_on_history_started_at"
+    t.index ["snapshot_id"], name: "index_test_article_histories_on_snapshot_id"
+    t.index ["test_article_id"], name: "index_test_article_histories_on_test_article_id"
+  end
+
+  create_table "test_articles", force: :cascade do |t|
+    t.string "title"
+    t.integer "test_category_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "test_categories", force: :cascade do |t|
+    t.string "name"
+    t.integer "test_articles_count", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "test_category_histories", force: :cascade do |t|
+    t.integer "test_category_id", null: false
+    t.string "name"
+    t.integer "test_articles_count", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_test_category_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_test_category_histories_on_history_started_at"
+    t.index ["snapshot_id"], name: "index_test_category_histories_on_snapshot_id"
+    t.index ["test_category_id"], name: "index_test_category_histories_on_test_category_id"
   end
 
   create_table "thing_with_compound_index_histories", force: :cascade do |t|

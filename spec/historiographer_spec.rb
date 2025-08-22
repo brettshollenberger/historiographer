@@ -919,110 +919,82 @@ describe Historiographer do
   end
 
   describe 'Association options preservation' do
+    # Test with inline class definitions to ensure associations are defined properly
+    
     before(:all) do
-      @original_stdout = $stdout
-      $stdout = StringIO.new
-      
-      ActiveRecord::Base.connection.create_table :test_articles, force: true do |t|
-        t.string :title
-        t.integer :test_category_id
-        t.timestamps
-      end unless ActiveRecord::Base.connection.table_exists?(:test_articles)
-      
-      ActiveRecord::Base.connection.create_table :test_categories, force: true do |t|
-        t.string :name
-        t.integer :test_articles_count, default: 0
-        t.timestamps
-      end unless ActiveRecord::Base.connection.table_exists?(:test_categories)
-      
-      ActiveRecord::Base.connection.create_table :test_article_histories, force: true do |t|
-        t.integer :test_article_id, null: false
-        t.string :title
-        t.integer :test_category_id
-        t.timestamps
-        t.datetime :history_started_at, null: false
-        t.datetime :history_ended_at
-        t.integer :history_user_id
-        t.string :snapshot_id
-        
-        t.index :test_article_id
-        t.index :history_started_at
-        t.index :history_ended_at
-        t.index :snapshot_id
-      end unless ActiveRecord::Base.connection.table_exists?(:test_article_histories)
-      
-      ActiveRecord::Base.connection.create_table :test_category_histories, force: true do |t|
-        t.integer :test_category_id, null: false
-        t.string :name
-        t.integer :test_articles_count, default: 0
-        t.timestamps
-        t.datetime :history_started_at, null: false
-        t.datetime :history_ended_at
-        t.integer :history_user_id
-        t.string :snapshot_id
-        
-        t.index :test_category_id
-        t.index :history_started_at
-        t.index :history_ended_at
-        t.index :snapshot_id
-      end unless ActiveRecord::Base.connection.table_exists?(:test_category_histories)
-      
-      class TestArticle < ActiveRecord::Base
+      # Create test classes inline for this test
+      class TestAssocArticle < ActiveRecord::Base
+        self.table_name = 'test_articles'
         include Historiographer
-        belongs_to :test_category, optional: true, touch: true, counter_cache: true
+        belongs_to :test_assoc_category, 
+                   class_name: 'TestAssocCategory',
+                   foreign_key: 'test_category_id',
+                   optional: true, 
+                   touch: true, 
+                   counter_cache: 'test_articles_count'
       end
       
-      class TestCategory < ActiveRecord::Base
+      class TestAssocCategory < ActiveRecord::Base
+        self.table_name = 'test_categories'
         include Historiographer
-        has_many :test_articles, dependent: :restrict_with_error, inverse_of: :test_category
+        has_many :test_assoc_articles, 
+                 class_name: 'TestAssocArticle',
+                 foreign_key: 'test_category_id',
+                 dependent: :restrict_with_error, 
+                 inverse_of: :test_assoc_category
       end
       
-      class TestArticleHistory < ActiveRecord::Base
+      class TestAssocArticleHistory < ActiveRecord::Base
+        self.table_name = 'test_article_histories'
         include Historiographer::History
       end
       
-      class TestCategoryHistory < ActiveRecord::Base
+      class TestAssocCategoryHistory < ActiveRecord::Base
+        self.table_name = 'test_category_histories'
         include Historiographer::History
       end
     end
     
     after(:all) do
-      $stdout = @original_stdout
-      ActiveRecord::Base.connection.drop_table :test_article_histories if ActiveRecord::Base.connection.table_exists?(:test_article_histories)
-      ActiveRecord::Base.connection.drop_table :test_articles if ActiveRecord::Base.connection.table_exists?(:test_articles)
-      ActiveRecord::Base.connection.drop_table :test_category_histories if ActiveRecord::Base.connection.table_exists?(:test_category_histories)
-      ActiveRecord::Base.connection.drop_table :test_categories if ActiveRecord::Base.connection.table_exists?(:test_categories)
-      Object.send(:remove_const, :TestArticle) if Object.const_defined?(:TestArticle)
-      Object.send(:remove_const, :TestArticleHistory) if Object.const_defined?(:TestArticleHistory)
-      Object.send(:remove_const, :TestCategory) if Object.const_defined?(:TestCategory)
-      Object.send(:remove_const, :TestCategoryHistory) if Object.const_defined?(:TestCategoryHistory)
+      Object.send(:remove_const, :TestAssocArticle) if Object.const_defined?(:TestAssocArticle)
+      Object.send(:remove_const, :TestAssocArticleHistory) if Object.const_defined?(:TestAssocArticleHistory)
+      Object.send(:remove_const, :TestAssocCategory) if Object.const_defined?(:TestAssocCategory)
+      Object.send(:remove_const, :TestAssocCategoryHistory) if Object.const_defined?(:TestAssocCategoryHistory)
     end
     
     it 'preserves optional setting for belongs_to associations' do
-      # Check the original TestArticle belongs_to :test_category association
-      article_association = TestArticle.reflect_on_association(:test_category)
+      # Check the original TestAssocArticle belongs_to association
+      article_association = TestAssocArticle.reflect_on_association(:test_assoc_category)
+      expect(article_association).not_to be_nil
       expect(article_association.options[:optional]).to eq(true)
       
-      # The TestArticleHistory should have the same options
-      article_history_association = TestArticleHistory.reflect_on_association(:test_category)
+      # Force the history class to be created/updated
+      TestAssocArticle.history_class
+      
+      # The TestAssocArticleHistory should have the same options
+      article_history_association = TestAssocArticleHistory.reflect_on_association(:test_assoc_category)
       expect(article_history_association).not_to be_nil
       expect(article_history_association.options[:optional]).to eq(true)
     end
     
     it 'preserves touch and counter_cache options for belongs_to associations' do
-      article_association = TestArticle.reflect_on_association(:test_category)
+      article_association = TestAssocArticle.reflect_on_association(:test_assoc_category)
       expect(article_association.options[:touch]).to eq(true)
-      expect(article_association.options[:counter_cache]).to eq(true)
+      expect(article_association.options[:counter_cache]).to eq('test_articles_count')
       
-      article_history_association = TestArticleHistory.reflect_on_association(:test_category)
+      # Force the history class to be created/updated
+      TestAssocArticle.history_class
+      
+      article_history_association = TestAssocArticleHistory.reflect_on_association(:test_assoc_category)
+      expect(article_history_association).not_to be_nil
       expect(article_history_association.options[:touch]).to eq(true)
-      expect(article_history_association.options[:counter_cache]).to eq(true)
+      expect(article_history_association.options[:counter_cache]).to eq('test_articles_count')
     end
     
     it 'preserves dependent and inverse_of options for has_many associations' do
-      category_articles_association = TestCategory.reflect_on_association(:test_articles)
+      category_articles_association = TestAssocCategory.reflect_on_association(:test_assoc_articles)
       expect(category_articles_association.options[:dependent]).to eq(:restrict_with_error)
-      expect(category_articles_association.options[:inverse_of]).to eq(:test_category)
+      expect(category_articles_association.options[:inverse_of]).to eq(:test_assoc_category)
       
       # Note: has_many associations might not be copied to history models in the same way
       # This is expected behavior since history models typically don't need the same associations
@@ -1030,14 +1002,18 @@ describe Historiographer do
     
     it 'allows creating history records with nil optional associations' do
       # Create an article without a category (should be valid since category is optional)
-      article = TestArticle.create!(title: 'Test Article without category', history_user_id: 1)
+      article = TestAssocArticle.create!(title: 'Test Article without category', history_user_id: 1)
       expect(article.test_category_id).to be_nil
       
       # The history record should also be created successfully
-      history = TestArticleHistory.last
+      history = TestAssocArticleHistory.last
       expect(history).not_to be_nil
       expect(history.test_category_id).to be_nil
       expect(history.test_article_id).to eq(article.id)
+
+      # Creating snapshots should work even with nil associations
+      article.snapshot
+      expect { article.snapshot }.to_not raise_error
     end
   end
 end
