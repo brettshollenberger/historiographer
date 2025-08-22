@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_11_19_000000) do
+ActiveRecord::Schema[7.1].define(version: 2025_08_23_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -99,57 +99,26 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_19_000000) do
   end
 
   create_table "easy_ml_column_histories", force: :cascade do |t|
-    t.integer "column_id", null: false
-    t.string "name", null: false
-    t.string "data_type", null: false
-    t.string "column_type"
+    t.integer "easy_ml_column_id", null: false
+    t.string "name"
+    t.string "data_type"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "history_started_at", null: false
     t.datetime "history_ended_at"
     t.integer "history_user_id"
     t.string "snapshot_id"
-    t.index ["column_id"], name: "index_easy_ml_column_histories_on_column_id"
+    t.index ["easy_ml_column_id"], name: "index_easy_ml_column_histories_on_easy_ml_column_id"
     t.index ["history_ended_at"], name: "index_easy_ml_column_histories_on_history_ended_at"
     t.index ["history_started_at"], name: "index_easy_ml_column_histories_on_history_started_at"
-    t.index ["history_user_id"], name: "index_easy_ml_column_histories_on_history_user_id"
     t.index ["snapshot_id"], name: "index_easy_ml_column_histories_on_snapshot_id"
   end
 
   create_table "easy_ml_columns", force: :cascade do |t|
-    t.string "name", null: false
-    t.string "data_type", null: false
-    t.string "column_type"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-  end
-
-  create_table "ml_model_histories", force: :cascade do |t|
-    t.integer "ml_model_id", null: false
     t.string "name"
-    t.string "model_type"
-    t.jsonb "parameters"
+    t.string "data_type"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.datetime "history_started_at", null: false
-    t.datetime "history_ended_at"
-    t.integer "history_user_id"
-    t.string "snapshot_id"
-    t.index ["history_ended_at"], name: "index_ml_model_histories_on_history_ended_at"
-    t.index ["history_started_at"], name: "index_ml_model_histories_on_history_started_at"
-    t.index ["history_user_id"], name: "index_ml_model_histories_on_history_user_id"
-    t.index ["ml_model_id"], name: "index_ml_model_histories_on_ml_model_id"
-    t.index ["model_type"], name: "index_ml_model_histories_on_model_type"
-    t.index ["snapshot_id"], name: "index_ml_model_histories_on_snapshot_id"
-  end
-
-  create_table "ml_models", force: :cascade do |t|
-    t.string "name"
-    t.string "model_type"
-    t.jsonb "parameters"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["model_type"], name: "index_ml_models_on_model_type"
   end
 
   create_table "post_histories", force: :cascade do |t|
@@ -166,7 +135,6 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_19_000000) do
     t.datetime "history_ended_at", precision: nil
     t.integer "history_user_id"
     t.string "snapshot_id"
-    t.string "type"
     t.index ["author_id"], name: "index_post_histories_on_author_id"
     t.index ["deleted_at"], name: "index_post_histories_on_deleted_at"
     t.index ["enabled"], name: "index_post_histories_on_enabled"
@@ -187,17 +155,17 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_19_000000) do
     t.datetime "deleted_at", precision: nil
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
-    t.string "type"
     t.index ["author_id"], name: "index_posts_on_author_id"
     t.index ["deleted_at"], name: "index_posts_on_deleted_at"
     t.index ["enabled"], name: "index_posts_on_enabled"
     t.index ["live_at"], name: "index_posts_on_live_at"
-    t.index ["type"], name: "index_posts_on_type"
   end
 
   create_table "project_file_histories", force: :cascade do |t|
     t.integer "project_file_id", null: false
+    t.integer "project_id"
     t.string "name", null: false
+    t.string "content"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.datetime "history_started_at", null: false
@@ -208,13 +176,17 @@ ActiveRecord::Schema[7.1].define(version: 2024_11_19_000000) do
     t.index ["history_started_at"], name: "index_project_file_histories_on_history_started_at"
     t.index ["history_user_id"], name: "index_project_file_histories_on_history_user_id"
     t.index ["project_file_id"], name: "index_project_file_histories_on_project_file_id"
+    t.index ["project_id"], name: "index_project_file_histories_on_project_id"
     t.index ["snapshot_id"], name: "index_project_file_histories_on_snapshot_id"
   end
 
   create_table "project_files", force: :cascade do |t|
+    t.bigint "project_id"
     t.string "name", null: false
+    t.string "content"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["project_id"], name: "index_project_files_on_project_id"
   end
 
   create_table "project_histories", force: :cascade do |t|

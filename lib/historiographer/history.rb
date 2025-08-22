@@ -133,10 +133,14 @@ module Historiographer
         end
       end
 
-      (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
-        define_method(method_name) do |*args, **kwargs, &block|
-          forward_method(method_name, *args, **kwargs, &block)
+      begin
+        (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
+          define_method(method_name) do |*args, **kwargs, &block|
+            forward_method(method_name, *args, **kwargs, &block)
+          end
         end
+      rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished
+        # Table might not exist yet during setup
       end
 
       # Add method_missing for any methods we might have missed
@@ -264,7 +268,10 @@ module Historiographer
       def define_history_association(association)
         if association.is_a?(Symbol) || association.is_a?(String)
           association = original_class.reflect_on_association(association)
+          # If the association doesn't exist on the original class, skip it
+          return unless association
         end
+        
         assoc_name = association.name
         assoc_module = association.active_record.module_parent
         assoc_history_class_name = "#{association.class_name}History"
@@ -305,7 +312,14 @@ module Historiographer
               ).first
             end
           else
-            belongs_to assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key
+            # Start with all original association options
+            options = association.options.dup
+            
+            # Override only the specific options we need to change
+            options[:class_name] = assoc_class_name
+            options[:foreign_key] = assoc_foreign_key
+            
+            belongs_to assoc_name, **options
           end
         when :has_one
           if assoc_class_name.match?(/History/)
@@ -323,7 +337,15 @@ module Historiographer
               ).first
             end
           else
-            has_one assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+            # Start with all original association options
+            options = association.options.dup
+            
+            # Override only the specific options we need to change
+            options[:class_name] = assoc_class_name
+            options[:foreign_key] = assoc_foreign_key
+            options[:primary_key] = history_foreign_key
+            
+            has_one assoc_name, **options
           end
         when :has_many
           if assoc_class_name.match?(/History/)
@@ -340,7 +362,15 @@ module Historiographer
               )
             end
           else
-            has_many assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+            # Start with all original association options
+            options = association.options.dup
+            
+            # Override only the specific options we need to change
+            options[:class_name] = assoc_class_name
+            options[:foreign_key] = assoc_foreign_key
+            options[:primary_key] = history_foreign_key
+            
+            has_many assoc_name, **options
           end
         end
       end
@@ -353,8 +383,9 @@ module Historiographer
       def history_foreign_key
         return @history_foreign_key if @history_foreign_key
 
-        # CAN THIS BE TABLE OR MODEL?
-        @history_foreign_key = original_class.base_class.name.singularize.foreign_key
+        # Use the table name to generate the foreign key to properly handle namespaced models
+        # E.g. EasyML::Column -> easy_ml_columns -> easy_ml_column_id
+        @history_foreign_key = original_class.base_class.table_name.singularize.foreign_key
       end
 
     end

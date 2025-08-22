@@ -5,6 +5,8 @@ class Post < ApplicationRecord
   acts_as_paranoid
   has_many :comments
 
+  attr_accessor :type
+  
   validates :type, inclusion: { in: ['Post', 'PrivatePost', nil] }
   before_validation :set_defaults
   after_find :set_comment_count

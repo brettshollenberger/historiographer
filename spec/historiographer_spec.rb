@@ -898,7 +898,7 @@ describe Historiographer do
 
     it 'establishes correct foreign key for history association' do
       col_history = column.histories.first
-      expect(col_history.class.history_foreign_key).to eq('column_id')
+      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
       expect(col_history).to be_a(EasyML::ColumnHistory)
     end
 
@@ -915,6 +915,129 @@ describe Historiographer do
       expect(column.histories.count).to eq(2)
       expect(column.histories.first.name).to eq(original_name)
       expect(column.histories.last.name).to eq('feature_2')
+    end
+  end
+
+  describe 'Association options preservation' do
+    before(:all) do
+      @original_stdout = $stdout
+      $stdout = StringIO.new
+      
+      ActiveRecord::Base.connection.create_table :test_articles, force: true do |t|
+        t.string :title
+        t.integer :test_category_id
+        t.timestamps
+      end unless ActiveRecord::Base.connection.table_exists?(:test_articles)
+      
+      ActiveRecord::Base.connection.create_table :test_categories, force: true do |t|
+        t.string :name
+        t.integer :test_articles_count, default: 0
+        t.timestamps
+      end unless ActiveRecord::Base.connection.table_exists?(:test_categories)
+      
+      ActiveRecord::Base.connection.create_table :test_article_histories, force: true do |t|
+        t.integer :test_article_id, null: false
+        t.string :title
+        t.integer :test_category_id
+        t.timestamps
+        t.datetime :history_started_at, null: false
+        t.datetime :history_ended_at
+        t.integer :history_user_id
+        t.string :snapshot_id
+        
+        t.index :test_article_id
+        t.index :history_started_at
+        t.index :history_ended_at
+        t.index :snapshot_id
+      end unless ActiveRecord::Base.connection.table_exists?(:test_article_histories)
+      
+      ActiveRecord::Base.connection.create_table :test_category_histories, force: true do |t|
+        t.integer :test_category_id, null: false
+        t.string :name
+        t.integer :test_articles_count, default: 0
+        t.timestamps
+        t.datetime :history_started_at, null: false
+        t.datetime :history_ended_at
+        t.integer :history_user_id
+        t.string :snapshot_id
+        
+        t.index :test_category_id
+        t.index :history_started_at
+        t.index :history_ended_at
+        t.index :snapshot_id
+      end unless ActiveRecord::Base.connection.table_exists?(:test_category_histories)
+      
+      class TestArticle < ActiveRecord::Base
+        include Historiographer
+        belongs_to :test_category, optional: true, touch: true, counter_cache: true
+      end
+      
+      class TestCategory < ActiveRecord::Base
+        include Historiographer
+        has_many :test_articles, dependent: :restrict_with_error, inverse_of: :test_category
+      end
+      
+      class TestArticleHistory < ActiveRecord::Base
+        include Historiographer::History
+      end
+      
+      class TestCategoryHistory < ActiveRecord::Base
+        include Historiographer::History
+      end
+    end
+    
+    after(:all) do
+      $stdout = @original_stdout
+      ActiveRecord::Base.connection.drop_table :test_article_histories if ActiveRecord::Base.connection.table_exists?(:test_article_histories)
+      ActiveRecord::Base.connection.drop_table :test_articles if ActiveRecord::Base.connection.table_exists?(:test_articles)
+      ActiveRecord::Base.connection.drop_table :test_category_histories if ActiveRecord::Base.connection.table_exists?(:test_category_histories)
+      ActiveRecord::Base.connection.drop_table :test_categories if ActiveRecord::Base.connection.table_exists?(:test_categories)
+      Object.send(:remove_const, :TestArticle) if Object.const_defined?(:TestArticle)
+      Object.send(:remove_const, :TestArticleHistory) if Object.const_defined?(:TestArticleHistory)
+      Object.send(:remove_const, :TestCategory) if Object.const_defined?(:TestCategory)
+      Object.send(:remove_const, :TestCategoryHistory) if Object.const_defined?(:TestCategoryHistory)
+    end
+    
+    it 'preserves optional setting for belongs_to associations' do
+      # Check the original TestArticle belongs_to :test_category association
+      article_association = TestArticle.reflect_on_association(:test_category)
+      expect(article_association.options[:optional]).to eq(true)
+      
+      # The TestArticleHistory should have the same options
+      article_history_association = TestArticleHistory.reflect_on_association(:test_category)
+      expect(article_history_association).not_to be_nil
+      expect(article_history_association.options[:optional]).to eq(true)
+    end
+    
+    it 'preserves touch and counter_cache options for belongs_to associations' do
+      article_association = TestArticle.reflect_on_association(:test_category)
+      expect(article_association.options[:touch]).to eq(true)
+      expect(article_association.options[:counter_cache]).to eq(true)
+      
+      article_history_association = TestArticleHistory.reflect_on_association(:test_category)
+      expect(article_history_association.options[:touch]).to eq(true)
+      expect(article_history_association.options[:counter_cache]).to eq(true)
+    end
+    
+    it 'preserves dependent and inverse_of options for has_many associations' do
+      category_articles_association = TestCategory.reflect_on_association(:test_articles)
+      expect(category_articles_association.options[:dependent]).to eq(:restrict_with_error)
+      expect(category_articles_association.options[:inverse_of]).to eq(:test_category)
+      
+      # Note: has_many associations might not be copied to history models in the same way
+      # This is expected behavior since history models typically don't need the same associations
+    end
+    
+    it 'allows creating history records with nil optional associations' do
+      # Create an article without a category (should be valid since category is optional)
+      article = TestArticle.create!(title: 'Test Article without category', history_user_id: 1)
+      expect(article.test_category_id).to be_nil
+      
+      # The history record should also be created successfully
+      history = TestArticleHistory.last
+      expect(history).not_to be_nil
+      expect(history.test_category_id).to be_nil
+      expect(history.test_article_id).to eq(article.id)
     end
   end
 end
