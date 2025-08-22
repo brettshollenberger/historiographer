@@ -1,0 +1,15 @@
+#!/usr/bin/env ruby
+# Setup script for development
+
+puts "Setting up Historiographer development environment..."
+
+system("bundle install")
+system("bundle exec rake db:create")
+system("bundle exec rake db:migrate")
+system("createdb historiographer_combustion_test 2>/dev/null")
+
+puts "\nSetup complete! You can now run:"
+puts "  bin/test        - Run regular tests"
+puts "  bin/test-rails  - Run Rails integration tests"
+puts "  bin/test-all    - Run all tests"
+puts "  bin/console     - Launch interactive console"

@@ -358,7 +358,22 @@ For contributors on OSX, you may have difficulty installing mysql:
 gem install mysql2 -v '0.4.10' --source 'https://rubygems.org/' -- --with-ldflags=-L/usr/local/opt/openssl/lib --with-cppflags=-I/usr/local/opt/openssl/include
 ```
 
+== Testing
+
+```bash
+# Initial setup
+bin/setup
+
+# Run tests
+bin/test        # Regular test suite (fast)
+bin/test-rails  # Rails integration tests (slower)
+bin/test-all    # Both test suites
+
+# Interactive console
+bin/console
+```
+
 == Copyright
 
-Copyright (c) 2016-2020 brettshollenberger. See LICENSE.txt for
+Copyright (c) 2016-2025 brettshollenberger. See LICENSE.txt for
 further details.

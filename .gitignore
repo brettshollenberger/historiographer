@@ -50,3 +50,4 @@ pkg
 
 spec/examples.txt
 tmp/
+*.log
