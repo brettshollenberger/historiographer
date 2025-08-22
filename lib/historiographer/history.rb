@@ -78,11 +78,24 @@ module Historiographer
       # "RetailerProductHistory."
       #
       foreign_class_name = base.name.gsub(/History$/) {}        # e.g. "RetailerProductHistory" => "RetailerProduct"
-      foreign_class = foreign_class_name.constantize
       association_name   = foreign_class_name.split("::").last.underscore.to_sym # e.g. "RetailerProduct" => :retailer_product
 
-      # Store the original class for method delegation
-      class_variable_set(:@@original_class, foreign_class)
+      # Defer foreign class resolution to avoid load order issues
+      base.define_singleton_method :foreign_class do
+        return class_variable_get(:@@foreign_class) if class_variable_defined?(:@@foreign_class)
+        begin
+          foreign_class = foreign_class_name.constantize
+          class_variable_set(:@@foreign_class, foreign_class)
+          foreign_class
+        rescue NameError => e
+          # If the class isn't loaded yet, return nil and it will be retried later
+          nil
+        end
+      end
+
+      # Store the foreign class name for later use
+      class_variable_set(:@@foreign_class_name, foreign_class_name)
+      class_variable_set(:@@association_name, association_name)
 
       #
       # A History class will be linked to the user
@@ -94,12 +107,20 @@ module Historiographer
       #
       # To use histories, a user class must be defined.
       #
-      unless foreign_class.ancestors.include?(Historiographer::Silent)
+      # Set up user association unless Silent module is included
+      # Defer this check until foreign_class is available
+      unless base.foreign_class && base.foreign_class.ancestors.include?(Historiographer::Silent)
         belongs_to :user, foreign_key: :history_user_id
       end
 
-      # Add method_added hook to the original class
-      foreign_class.singleton_class.class_eval do
+      # Add method_added hook to the original class when it's available
+      # This needs to be deferred until the foreign class is loaded
+      base.define_singleton_method :setup_method_delegation do
+        return unless foreign_class
+        return if class_variable_defined?(:@@method_delegation_setup) && class_variable_get(:@@method_delegation_setup)
+        class_variable_set(:@@method_delegation_setup, true)
+        
+        foreign_class.singleton_class.class_eval do
         # Keep track of original method_added if it exists
         if method_defined?(:method_added)
           alias_method :original_method_added, :method_added
@@ -120,9 +141,9 @@ module Historiographer
             return unless method_obj.owner == self
 
             # Skip if we've already defined this method in the history class
-            return if foreign_class.history_class.method_defined?(method_name)
+            return if self.history_class.method_defined?(method_name)
 
-            foreign_class.history_class.class_eval do
+            self.history_class.class_eval do
               define_method(method_name) do |*args, **kwargs, &block|
                 forward_method(method_name, *args, **kwargs, &block)
               end
@@ -134,19 +155,29 @@ module Historiographer
       end
 
       begin
-        (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
-          define_method(method_name) do |*args, **kwargs, &block|
-            forward_method(method_name, *args, **kwargs, &block)
-          end
         end
-      rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished
-        # Table might not exist yet during setup
+      end
+      
+      # Try to set up method delegation if foreign class is available
+      base.setup_method_delegation if base.foreign_class
+      
+      # Also delegate existing methods from the foreign class
+      if base.foreign_class
+        begin
+          (base.foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
+            define_method(method_name) do |*args, **kwargs, &block|
+              forward_method(method_name, *args, **kwargs, &block)
+            end
+          end
+        rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished
+          # Table might not exist yet during setup
+        end
       end
 
       # Add method_missing for any methods we might have missed
       def method_missing(method_name, *args, **kwargs, &block)
-        original_class = self.class.class_variable_get(:@@original_class)
-        if original_class.method_defined?(method_name)
+        original_class = self.class.foreign_class
+        if original_class && original_class.method_defined?(method_name)
           forward_method(method_name, *args, **kwargs, &block)
         else
           super
@@ -154,8 +185,8 @@ module Historiographer
       end
 
       def respond_to_missing?(method_name, include_private = false)
-        original_class = self.class.class_variable_get(:@@original_class)
-        original_class.method_defined?(method_name) || super
+        original_class = self.class.foreign_class
+        (original_class && original_class.method_defined?(method_name)) || super
       end
 
       #
@@ -241,29 +272,36 @@ module Historiographer
       history_classes = Thread.current[:historiographer_history_classes] ||= []
       history_classes << base
       
+      # Always define the setup_history_associations method
+      base.define_singleton_method :setup_history_associations do |force = false|
+        return if !force && class_variable_defined?(:@@associations_set_up) && class_variable_get(:@@associations_set_up)
+        class_variable_set(:@@associations_set_up, true)
+        
+        return unless foreign_class
+        
+        # Also set up method delegation if not already done
+        setup_method_delegation if respond_to?(:setup_method_delegation)
+        
+        foreign_class.reflect_on_all_associations.each do |association|
+          begin
+            define_history_association(association)
+          rescue => e
+            # Log but don't fail
+            puts "Warning: Could not define history association #{association.name}: #{e.message}" if ENV['DEBUG']
+          end
+        end
+      end
+      
       # Set up the after_initialize hook if we're in a Rails app
       if defined?(Rails) && Rails.respond_to?(:application) && Rails.application && Rails.application.config.respond_to?(:after_initialize)
         Rails.application.config.after_initialize do
           history_classes.each do |history_class|
+            history_class.setup_method_delegation if history_class.respond_to?(:setup_method_delegation)
             history_class.setup_history_associations
           end
         end
       else
-        # For non-Rails environments (like our test suite), set up associations immediately
-        # but defer if models aren't loaded yet
-        base.define_singleton_method :setup_history_associations do |force = false|
-          return if !force && class_variable_defined?(:@@associations_set_up) && class_variable_get(:@@associations_set_up)
-          class_variable_set(:@@associations_set_up, true)
-          
-          foreign_class.reflect_on_all_associations.each do |association|
-            begin
-              define_history_association(association)
-            rescue => e
-              # Log but don't fail
-              puts "Warning: Could not define history association #{association.name}: #{e.message}" if ENV['DEBUG']
-            end
-          end
-        end
+        # For non-Rails environments, try to set up associations immediately
         
         # Try to set up now if possible
         begin
@@ -301,11 +339,8 @@ module Historiographer
       end
 
       def original_class
-        unless class_variable_defined?(:@@original_class)
-          class_variable_set(:@@original_class, self.name.gsub(/History$/, '').constantize)
-        end
-
-        class_variable_get(:@@original_class)
+        # Use the foreign_class method we defined earlier
+        foreign_class
       end
 
       def define_history_association(association)
