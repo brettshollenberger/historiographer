@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+# Run all tests (regular and Rails integration)
+
+puts "\n========== Running Regular Test Suite ==========\n"
+system("bundle exec rspec --exclude-pattern spec/rails_integration/**/*_spec.rb")
+
+puts "\n========== Running Rails Integration Tests ==========\n"
+system("bundle exec rspec spec/rails_integration")
+
+exit($?.exitstatus || 0)

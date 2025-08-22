@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+# Run Rails integration tests with Combustion
+
+puts "Running Rails integration tests..."
+exec "bundle exec rspec spec/rails_integration/historiographer_rails_integration_spec.rb"

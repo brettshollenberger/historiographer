@@ -52,3 +52,57 @@ end
 
 require 'standalone_migrations'
 StandaloneMigrations::Tasks.load_tasks
+
+# Custom tasks for common operations
+namespace :spec do
+  require 'rspec/core/rake_task'
+  
+  desc "Run regular specs (excluding Rails integration)"
+  RSpec::Core::RakeTask.new(:regular) do |t|
+    t.rspec_opts = "--exclude-pattern spec/rails_integration/**/*_spec.rb"
+  end
+  
+  desc "Run Rails integration specs with Combustion"
+  RSpec::Core::RakeTask.new(:rails) do |t|
+    t.pattern = "spec/rails_integration/**/*_spec.rb"
+  end
+  
+  desc "Run all specs (regular and Rails integration separately)"
+  task :all do
+    puts "\n========== Running Regular Specs ==========\n"
+    Rake::Task['spec:regular'].invoke
+    puts "\n========== Running Rails Integration Specs ==========\n"
+    Rake::Task['spec:rails'].invoke
+  end
+end
+
+desc "Run regular test suite (default)"
+task :spec => 'spec:regular'
+
+desc "Setup test database"
+task :test_setup do
+  sh "bundle exec rake db:create"
+  sh "bundle exec rake db:migrate"
+end
+
+desc "Reset test database"
+task :test_reset do
+  sh "bundle exec rake db:drop"
+  sh "bundle exec rake db:create"
+  sh "bundle exec rake db:migrate"
+end
+
+desc "Run linting and type checking"
+task :lint do
+  puts "No linting configured yet. Consider adding rubocop."
+end
+
+desc "Console with the gem loaded"
+task :console do
+  sh "bundle exec pry -r ./init.rb"
+end
+
+desc "List all available tasks"
+task :help do
+  sh "rake -T"
+end

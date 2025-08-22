@@ -1,0 +1,9 @@
+test:
+  adapter: postgresql
+  database: historiographer_combustion_test
+  username: <%= ENV['DB_USERNAME'] || 'postgres' %>
+  password: <%= ENV['DB_PASSWORD'] || '' %>
+  host: <%= ENV['DB_HOST'] || 'localhost' %>
+  port: <%= ENV['DB_PORT'] || 5432 %>
+  pool: 5
+  timeout: 5000

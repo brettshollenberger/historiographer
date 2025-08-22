@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+# Launch an interactive console with the gem loaded
+
+require "bundler/setup"
+require "pry"
+require_relative "../init"
+
+puts "Loading Historiographer console..."
+puts "Models available: Post, Author, Comment, User, etc."
+Pry.start

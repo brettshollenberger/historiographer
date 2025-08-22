@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_08_25_000000) do
+ActiveRecord::Schema[7.1].define(version: 2025_08_26_000003) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -343,6 +343,50 @@ ActiveRecord::Schema[7.1].define(version: 2025_08_25_000000) do
     t.index ["history_started_at"], name: "index_test_category_histories_on_history_started_at"
     t.index ["snapshot_id"], name: "index_test_category_histories_on_snapshot_id"
     t.index ["test_category_id"], name: "index_test_category_histories_on_test_category_id"
+  end
+
+  create_table "test_user_histories", force: :cascade do |t|
+    t.integer "test_user_id", null: false
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_test_user_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_test_user_histories_on_history_started_at"
+    t.index ["snapshot_id"], name: "index_test_user_histories_on_snapshot_id"
+    t.index ["test_user_id"], name: "index_test_user_histories_on_test_user_id"
+  end
+
+  create_table "test_users", force: :cascade do |t|
+    t.string "name"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "test_website_histories", force: :cascade do |t|
+    t.integer "test_website_id", null: false
+    t.string "name"
+    t.integer "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_test_website_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_test_website_histories_on_history_started_at"
+    t.index ["snapshot_id"], name: "index_test_website_histories_on_snapshot_id"
+    t.index ["test_website_id"], name: "index_test_website_histories_on_test_website_id"
+  end
+
+  create_table "test_websites", force: :cascade do |t|
+    t.string "name"
+    t.integer "user_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
   create_table "thing_with_compound_index_histories", force: :cascade do |t|
