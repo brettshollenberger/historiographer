@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_08_24_000001) do
+ActiveRecord::Schema[7.1].define(version: 2025_08_25_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -40,6 +40,14 @@ ActiveRecord::Schema[7.1].define(version: 2025_08_24_000001) do
     t.datetime "created_at", precision: nil, null: false
     t.datetime "updated_at", precision: nil, null: false
     t.index ["deleted_at"], name: "index_authors_on_deleted_at"
+  end
+
+  create_table "bylines", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "author_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["author_id"], name: "index_bylines_on_author_id"
   end
 
   create_table "comment_histories", force: :cascade do |t|

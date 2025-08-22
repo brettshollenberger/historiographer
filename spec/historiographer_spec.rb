@@ -918,6 +918,62 @@ describe Historiographer do
     end
   end
 
+  describe 'Non-historiographer associations' do
+    it 'preserves associations to models without history tracking' do
+      # Create an author and byline (byline has no history tracking)
+      author = Author.create!(full_name: 'Test Author', history_user_id: 1)
+      byline = Byline.create!(name: 'Test Byline', author: author)
+      
+      # The author should have the byline association
+      expect(author.bylines).to include(byline)
+      
+      # Get the author's history record
+      author_history = AuthorHistory.last
+      expect(author_history).not_to be_nil
+      
+      # The history model should still be able to access the byline (non-history model)
+      # This should work because Byline doesn't have history tracking
+      expect(author_history.bylines).to include(byline)
+      
+      # The association should point to the regular Byline model, not a history model
+      byline_association = AuthorHistory.reflect_on_association(:bylines)
+      expect(byline_association).not_to be_nil
+      expect(byline_association.klass).to eq(Byline)
+    end
+    
+    it 'handles mixed associations correctly' do
+      # Create an author with both history-tracked and non-history-tracked associations
+      author = Author.create!(full_name: 'Test Author', history_user_id: 1)
+      post = Post.create!(title: 'Test Post', body: 'Test body', author_id: author.id, history_user_id: 1)
+      comment = Comment.create!(body: 'Test comment', author_id: author.id, post_id: post.id, history_user_id: 1)
+      byline = Byline.create!(name: 'Test Byline', author: author)
+      
+      author_history = AuthorHistory.last
+      
+      # History-tracked associations should work correctly
+      # Note: For history associations, we create custom methods rather than Rails associations
+      # so they won't show up in reflect_on_all_associations
+      expect(author_history).to respond_to(:posts)
+      expect(author_history).to respond_to(:comments)
+      
+      # The methods should return history records filtered by snapshot_id
+      post_histories = PostHistory.where(author_id: author.id)
+      expect(post_histories).not_to be_empty
+      
+      # When accessing through the history model, it should filter by snapshot_id
+      author_history_posts = author_history.posts
+      expect(author_history_posts).to be_a(ActiveRecord::Relation)
+      
+      # Non-history-tracked associations should show up as regular Rails associations
+      bylines_association = AuthorHistory.reflect_on_association(:bylines)
+      expect(bylines_association).not_to be_nil
+      expect(bylines_association.klass).to eq(Byline)
+      
+      # And they should work correctly
+      expect(author_history.bylines).to include(byline)
+    end
+  end
+
   describe 'Association options preservation' do
     # Test with inline class definitions to ensure associations are defined properly
     
@@ -953,6 +1009,11 @@ describe Historiographer do
         self.table_name = 'test_category_histories'
         include Historiographer::History
       end
+      
+      # Manually trigger association setup since we're in a test environment
+      # Force = true because associations may have been partially set up before all models were loaded
+      TestAssocArticleHistory.setup_history_associations(true) if TestAssocArticleHistory.respond_to?(:setup_history_associations)
+      TestAssocCategoryHistory.setup_history_associations(true) if TestAssocCategoryHistory.respond_to?(:setup_history_associations)
     end
     
     after(:all) do
@@ -968,9 +1029,6 @@ describe Historiographer do
       expect(article_association).not_to be_nil
       expect(article_association.options[:optional]).to eq(true)
       
-      # Force the history class to be created/updated
-      TestAssocArticle.history_class
-      
       # The TestAssocArticleHistory should have the same options
       article_history_association = TestAssocArticleHistory.reflect_on_association(:test_assoc_category)
       expect(article_history_association).not_to be_nil
@@ -981,9 +1039,6 @@ describe Historiographer do
       article_association = TestAssocArticle.reflect_on_association(:test_assoc_category)
       expect(article_association.options[:touch]).to eq(true)
       expect(article_association.options[:counter_cache]).to eq('test_articles_count')
-      
-      # Force the history class to be created/updated
-      TestAssocArticle.history_class
       
       article_history_association = TestAssocArticleHistory.reflect_on_association(:test_assoc_category)
       expect(article_history_association).not_to be_nil
