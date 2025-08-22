@@ -45,10 +45,9 @@ module Rails
   end
 
   def self.application
-    OpenStruct.new(
+    @application ||= OpenStruct.new(
       config: OpenStruct.new(
-        eager_load_namespaces: [],
-        autoloader: loader
+        eager_load_namespaces: []
       )
     )
   end

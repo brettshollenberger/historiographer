@@ -133,10 +133,14 @@ module Historiographer
         end
       end
 
-      (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
-        define_method(method_name) do |*args, **kwargs, &block|
-          forward_method(method_name, *args, **kwargs, &block)
+      begin
+        (foreign_class.columns.map(&:name) - ["id"]).each do |method_name|
+          define_method(method_name) do |*args, **kwargs, &block|
+            forward_method(method_name, *args, **kwargs, &block)
+          end
         end
+      rescue ActiveRecord::StatementInvalid, ActiveRecord::ConnectionNotEstablished
+        # Table might not exist yet during setup
       end
 
       # Add method_missing for any methods we might have missed
@@ -233,9 +237,52 @@ module Historiographer
       # Track custom association methods
       base.class_variable_set(:@@history_association_methods, [])
       
-      # Dynamically define associations on the history class
-      foreign_class.reflect_on_all_associations.each do |association|
-        define_history_association(association)
+      # Register this history class to have its associations set up after initialization
+      history_classes = Thread.current[:historiographer_history_classes] ||= []
+      history_classes << base
+      
+      # Set up the after_initialize hook if we're in a Rails app
+      if defined?(Rails) && Rails.respond_to?(:application) && Rails.application && Rails.application.config.respond_to?(:after_initialize)
+        Rails.application.config.after_initialize do
+          history_classes.each do |history_class|
+            history_class.setup_history_associations
+          end
+        end
+      else
+        # For non-Rails environments (like our test suite), set up associations immediately
+        # but defer if models aren't loaded yet
+        base.define_singleton_method :setup_history_associations do |force = false|
+          return if !force && class_variable_defined?(:@@associations_set_up) && class_variable_get(:@@associations_set_up)
+          class_variable_set(:@@associations_set_up, true)
+          
+          foreign_class.reflect_on_all_associations.each do |association|
+            begin
+              define_history_association(association)
+            rescue => e
+              # Log but don't fail
+              puts "Warning: Could not define history association #{association.name}: #{e.message}" if ENV['DEBUG']
+            end
+          end
+        end
+        
+        # Try to set up now if possible
+        begin
+          base.setup_history_associations
+        rescue => e
+          # Will retry later
+        end
+        
+        # Override reflect_on_association to ensure associations are defined
+        base.define_singleton_method :reflect_on_association do |name|
+          setup_history_associations rescue nil
+          super(name)
+        end
+        
+        # Override reflect_on_all_associations to ensure associations are defined
+        base.define_singleton_method :reflect_on_all_associations do |*args|
+          setup_history_associations rescue nil
+          super(*args)
+        end
       end
 
       def snapshot
@@ -264,83 +311,133 @@ module Historiographer
       def define_history_association(association)
         if association.is_a?(Symbol) || association.is_a?(String)
           association = original_class.reflect_on_association(association)
+          # If the association doesn't exist on the original class, skip it
+          return unless association
         end
+        
         assoc_name = association.name
-        assoc_module = association.active_record.module_parent
-        assoc_history_class_name = "#{association.class_name}History"
-
-        begin
-          assoc_module.const_get(assoc_history_class_name)
-          assoc_history_class_name = "#{assoc_module}::#{assoc_history_class_name}" unless assoc_history_class_name.match?(Regexp.new("#{assoc_module}::"))
-        rescue
-        end
-
         assoc_foreign_key = association.foreign_key
 
         # Skip through associations to history classes to avoid infinite loops
         return if association.class_name.end_with?('History')
 
-        # Always use the history class if it exists
-        assoc_class = assoc_history_class_name.safe_constantize || OpenStruct.new(name: association.class_name)
-        assoc_class_name = assoc_class.name
+        # Get the associated model's table name
+        original_assoc_class = association.class_name.safe_constantize
+        return unless original_assoc_class  # Can't proceed without the class
+        
+        assoc_table_name = original_assoc_class.table_name
+        history_table_name = "#{assoc_table_name.singularize}_histories"
+        
+        # Check if a history table exists for this association
+        has_history_table = ActiveRecord::Base.connection.tables.include?(history_table_name)
+        
+        if has_history_table
+          # This model has history tracking, use the history class
+          assoc_history_class_name = "#{association.class_name}History"
+          assoc_module = association.active_record.module_parent
+          
+          begin
+            assoc_module.const_get(assoc_history_class_name)
+            assoc_history_class_name = "#{assoc_module}::#{assoc_history_class_name}" unless assoc_history_class_name.match?(Regexp.new("#{assoc_module}::"))
+          rescue
+          end
+          
+          assoc_class = assoc_history_class_name.safe_constantize || OpenStruct.new(name: assoc_history_class_name)
+          assoc_class_name = assoc_class.name
+        else
+          # No history table, use the original model
+          assoc_class_name = association.class_name
+        end
 
         case association.macro
         when :belongs_to
-          # For belongs_to associations, if the target is a history class, we need special handling
+          # Start with all original association options
+          options = association.options.dup
+          
+          # Override the class name and foreign key
+          options[:class_name] = assoc_class_name
+          options[:foreign_key] = assoc_foreign_key
+          
+          # For history associations, we need to handle snapshot filtering differently
+          # We'll create the association but override the accessor method
           if assoc_class_name.match?(/History/)
-            # Override the association method to filter by snapshot_id
-            # The history class uses <model>_id as the foreign key (e.g., author_id for AuthorHistory)
+            # Create the Rails association first
+            belongs_to assoc_name, **options
+            
+            # Then override the accessor to filter by snapshot_id
             history_fk = association.class_name.gsub(/History$/, '').underscore + '_id'
             
-            # Track this custom method
-            methods_list = class_variable_get(:@@history_association_methods) rescue []
-            methods_list << assoc_name
-            class_variable_set(:@@history_association_methods, methods_list)
-            
-            define_method(assoc_name) do
+            define_method("#{assoc_name}_with_snapshot") do
               return nil unless self[assoc_foreign_key]
               assoc_class.where(
                 history_fk => self[assoc_foreign_key],
                 snapshot_id: self.snapshot_id
               ).first
             end
+            
+            # Alias the original method and replace it
+            alias_method "#{assoc_name}_without_snapshot", assoc_name
+            alias_method assoc_name, "#{assoc_name}_with_snapshot"
           else
-            belongs_to assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key
+            belongs_to assoc_name, **options
           end
         when :has_one
+          # Start with all original association options
+          options = association.options.dup
+          
+          # Override the class name and keys
+          options[:class_name] = assoc_class_name
+          options[:foreign_key] = assoc_foreign_key
+          options[:primary_key] = history_foreign_key
+          
           if assoc_class_name.match?(/History/)
+            # Create the Rails association first
+            has_one assoc_name, **options
+            
+            # Then override the accessor to filter by snapshot_id
             hfk = history_foreign_key
             
-            # Track this custom method
-            methods_list = class_variable_get(:@@history_association_methods) rescue []
-            methods_list << assoc_name
-            class_variable_set(:@@history_association_methods, methods_list)
-            
-            define_method(assoc_name) do
+            define_method("#{assoc_name}_with_snapshot") do
               assoc_class.where(
                 assoc_foreign_key => self[hfk],
                 snapshot_id: self.snapshot_id
               ).first
             end
+            
+            # Alias the original method and replace it
+            alias_method "#{assoc_name}_without_snapshot", assoc_name
+            alias_method assoc_name, "#{assoc_name}_with_snapshot"
           else
-            has_one assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+            has_one assoc_name, **options
           end
         when :has_many
+          # Start with all original association options
+          options = association.options.dup
+          
+          # Override the class name and keys
+          options[:class_name] = assoc_class_name
+          options[:foreign_key] = assoc_foreign_key
+          options[:primary_key] = history_foreign_key
+          
           if assoc_class_name.match?(/History/)
-            hfk = history_foreign_key
-            # Track this custom method
-            methods_list = class_variable_get(:@@history_association_methods) rescue []
-            methods_list << assoc_name
-            class_variable_set(:@@history_association_methods, methods_list)
+            # Create the Rails association first
+            has_many assoc_name, **options
             
-            define_method(assoc_name) do
+            # Then override the accessor to filter by snapshot_id
+            hfk = history_foreign_key
+            
+            define_method("#{assoc_name}_with_snapshot") do
               assoc_class.where(
                 assoc_foreign_key => self[hfk],
                 snapshot_id: self.snapshot_id
               )
             end
+            
+            # Alias the original method and replace it
+            alias_method "#{assoc_name}_without_snapshot", assoc_name
+            alias_method assoc_name, "#{assoc_name}_with_snapshot"
           else
-            has_many assoc_name, class_name: assoc_class_name, foreign_key: assoc_foreign_key, primary_key: history_foreign_key
+            has_many assoc_name, **options
           end
         end
       end
@@ -353,8 +450,9 @@ module Historiographer
       def history_foreign_key
         return @history_foreign_key if @history_foreign_key
 
-        # CAN THIS BE TABLE OR MODEL?
-        @history_foreign_key = original_class.base_class.name.singularize.foreign_key
+        # Use the table name to generate the foreign key to properly handle namespaced models
+        # E.g. EasyML::Column -> easy_ml_columns -> easy_ml_column_id
+        @history_foreign_key = original_class.base_class.table_name.singularize.foreign_key
       end
 
     end

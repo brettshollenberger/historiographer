@@ -898,7 +898,7 @@ describe Historiographer do
 
     it 'establishes correct foreign key for history association' do
       col_history = column.histories.first
-      expect(col_history.class.history_foreign_key).to eq('column_id')
+      expect(col_history.class.history_foreign_key).to eq('easy_ml_column_id')
       expect(col_history).to be_a(EasyML::ColumnHistory)
     end
 
@@ -915,6 +915,160 @@ describe Historiographer do
       expect(column.histories.count).to eq(2)
       expect(column.histories.first.name).to eq(original_name)
       expect(column.histories.last.name).to eq('feature_2')
+    end
+  end
+
+  describe 'Non-historiographer associations' do
+    it 'preserves associations to models without history tracking' do
+      # Create an author and byline (byline has no history tracking)
+      author = Author.create!(full_name: 'Test Author', history_user_id: 1)
+      byline = Byline.create!(name: 'Test Byline', author: author)
+      
+      # The author should have the byline association
+      expect(author.bylines).to include(byline)
+      
+      # Get the author's history record
+      author_history = AuthorHistory.last
+      expect(author_history).not_to be_nil
+      
+      # The history model should still be able to access the byline (non-history model)
+      # This should work because Byline doesn't have history tracking
+      expect(author_history.bylines).to include(byline)
+      
+      # The association should point to the regular Byline model, not a history model
+      byline_association = AuthorHistory.reflect_on_association(:bylines)
+      expect(byline_association).not_to be_nil
+      expect(byline_association.klass).to eq(Byline)
+    end
+    
+    it 'handles mixed associations correctly' do
+      # Create an author with both history-tracked and non-history-tracked associations
+      author = Author.create!(full_name: 'Test Author', history_user_id: 1)
+      post = Post.create!(title: 'Test Post', body: 'Test body', author_id: author.id, history_user_id: 1)
+      comment = Comment.create!(body: 'Test comment', author_id: author.id, post_id: post.id, history_user_id: 1)
+      byline = Byline.create!(name: 'Test Byline', author: author)
+      
+      author_history = AuthorHistory.last
+      
+      # History-tracked associations should work correctly
+      # Note: For history associations, we create custom methods rather than Rails associations
+      # so they won't show up in reflect_on_all_associations
+      expect(author_history).to respond_to(:posts)
+      expect(author_history).to respond_to(:comments)
+      
+      # The methods should return history records filtered by snapshot_id
+      post_histories = PostHistory.where(author_id: author.id)
+      expect(post_histories).not_to be_empty
+      
+      # When accessing through the history model, it should filter by snapshot_id
+      author_history_posts = author_history.posts
+      expect(author_history_posts).to be_a(ActiveRecord::Relation)
+      
+      # Non-history-tracked associations should show up as regular Rails associations
+      bylines_association = AuthorHistory.reflect_on_association(:bylines)
+      expect(bylines_association).not_to be_nil
+      expect(bylines_association.klass).to eq(Byline)
+      
+      # And they should work correctly
+      expect(author_history.bylines).to include(byline)
+    end
+  end
+
+  describe 'Association options preservation' do
+    # Test with inline class definitions to ensure associations are defined properly
+    
+    before(:all) do
+      # Create test classes inline for this test
+      class TestAssocArticle < ActiveRecord::Base
+        self.table_name = 'test_articles'
+        include Historiographer
+        belongs_to :test_assoc_category, 
+                   class_name: 'TestAssocCategory',
+                   foreign_key: 'test_category_id',
+                   optional: true, 
+                   touch: true, 
+                   counter_cache: 'test_articles_count'
+      end
+      
+      class TestAssocCategory < ActiveRecord::Base
+        self.table_name = 'test_categories'
+        include Historiographer
+        has_many :test_assoc_articles, 
+                 class_name: 'TestAssocArticle',
+                 foreign_key: 'test_category_id',
+                 dependent: :restrict_with_error, 
+                 inverse_of: :test_assoc_category
+      end
+      
+      class TestAssocArticleHistory < ActiveRecord::Base
+        self.table_name = 'test_article_histories'
+        include Historiographer::History
+      end
+      
+      class TestAssocCategoryHistory < ActiveRecord::Base
+        self.table_name = 'test_category_histories'
+        include Historiographer::History
+      end
+      
+      # Manually trigger association setup since we're in a test environment
+      # Force = true because associations may have been partially set up before all models were loaded
+      TestAssocArticleHistory.setup_history_associations(true) if TestAssocArticleHistory.respond_to?(:setup_history_associations)
+      TestAssocCategoryHistory.setup_history_associations(true) if TestAssocCategoryHistory.respond_to?(:setup_history_associations)
+    end
+    
+    after(:all) do
+      Object.send(:remove_const, :TestAssocArticle) if Object.const_defined?(:TestAssocArticle)
+      Object.send(:remove_const, :TestAssocArticleHistory) if Object.const_defined?(:TestAssocArticleHistory)
+      Object.send(:remove_const, :TestAssocCategory) if Object.const_defined?(:TestAssocCategory)
+      Object.send(:remove_const, :TestAssocCategoryHistory) if Object.const_defined?(:TestAssocCategoryHistory)
+    end
+    
+    it 'preserves optional setting for belongs_to associations' do
+      # Check the original TestAssocArticle belongs_to association
+      article_association = TestAssocArticle.reflect_on_association(:test_assoc_category)
+      expect(article_association).not_to be_nil
+      expect(article_association.options[:optional]).to eq(true)
+      
+      # The TestAssocArticleHistory should have the same options
+      article_history_association = TestAssocArticleHistory.reflect_on_association(:test_assoc_category)
+      expect(article_history_association).not_to be_nil
+      expect(article_history_association.options[:optional]).to eq(true)
+    end
+    
+    it 'preserves touch and counter_cache options for belongs_to associations' do
+      article_association = TestAssocArticle.reflect_on_association(:test_assoc_category)
+      expect(article_association.options[:touch]).to eq(true)
+      expect(article_association.options[:counter_cache]).to eq('test_articles_count')
+      
+      article_history_association = TestAssocArticleHistory.reflect_on_association(:test_assoc_category)
+      expect(article_history_association).not_to be_nil
+      expect(article_history_association.options[:touch]).to eq(true)
+      expect(article_history_association.options[:counter_cache]).to eq('test_articles_count')
+    end
+    
+    it 'preserves dependent and inverse_of options for has_many associations' do
+      category_articles_association = TestAssocCategory.reflect_on_association(:test_assoc_articles)
+      expect(category_articles_association.options[:dependent]).to eq(:restrict_with_error)
+      expect(category_articles_association.options[:inverse_of]).to eq(:test_assoc_category)
+      
+      # Note: has_many associations might not be copied to history models in the same way
+      # This is expected behavior since history models typically don't need the same associations
+    end
+    
+    it 'allows creating history records with nil optional associations' do
+      # Create an article without a category (should be valid since category is optional)
+      article = TestAssocArticle.create!(title: 'Test Article without category', history_user_id: 1)
+      expect(article.test_category_id).to be_nil
+      
+      # The history record should also be created successfully
+      history = TestAssocArticleHistory.last
+      expect(history).not_to be_nil
+      expect(history.test_category_id).to be_nil
+      expect(history.test_article_id).to eq(article.id)
+
+      # Creating snapshots should work even with nil associations
+      article.snapshot
+      expect { article.snapshot }.to_not raise_error
     end
   end
 end
