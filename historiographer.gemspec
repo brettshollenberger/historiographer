@@ -11,7 +11,7 @@ Gem::Specification.new do |s|
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
   s.authors = ["brettshollenberger".freeze]
-  s.date = "2025-08-22"
+  s.date = "2025-09-19"
   s.description = "Creates separate tables for each history table".freeze
   s.email = "brett.shollenberger@gmail.com".freeze
   s.executables = ["console".freeze, "setup".freeze, "test".freeze, "test-all".freeze, "test-rails".freeze]
@@ -20,13 +20,8 @@ Gem::Specification.new do |s|
     "README.md"
   ]
   s.files = [
-    ".document",
-    ".rspec",
-    ".ruby-version",
-    ".standalone_migrations",
     "DEVELOPMENT.md",
     "Gemfile",
-    "Gemfile.lock",
     "Guardfile",
     "LICENSE.txt",
     "README.md",
@@ -37,10 +32,6 @@ Gem::Specification.new do |s|
     "bin/test",
     "bin/test-all",
     "bin/test-rails",
-    "historiographer-4.1.12.gem",
-    "historiographer-4.1.13.gem",
-    "historiographer-4.1.14.gem",
-    "historiographer-4.3.0.gem",
     "historiographer.gemspec",
     "init.rb",
     "instructions/implementation.md",
@@ -83,7 +74,17 @@ Gem::Specification.new do |s|
     "spec/db/migrate/20250826000001_create_test_user_histories.rb",
     "spec/db/migrate/20250826000002_create_test_websites.rb",
     "spec/db/migrate/20250826000003_create_test_website_histories.rb",
+    "spec/db/migrate/20250827000000_create_templates.rb",
+    "spec/db/migrate/20250827000001_create_template_histories.rb",
+    "spec/db/migrate/20250827000002_create_websites.rb",
+    "spec/db/migrate/20250827000003_create_website_histories.rb",
+    "spec/db/migrate/20250827000004_create_template_files.rb",
+    "spec/db/migrate/20250827000005_create_template_file_histories.rb",
+    "spec/db/migrate/20250827000006_create_website_files.rb",
+    "spec/db/migrate/20250827000007_create_website_file_histories.rb",
+    "spec/db/migrate/20250827000008_create_code_files_view.rb",
     "spec/db/schema.rb",
+    "spec/examples.txt",
     "spec/factories/post.rb",
     "spec/historiographer_spec.rb",
     "spec/integration/historiographer_safe_integration_spec.rb",
@@ -95,10 +96,13 @@ Gem::Specification.new do |s|
     "spec/internal/config/database.yml",
     "spec/internal/config/routes.rb",
     "spec/internal/db/schema.rb",
+    "spec/internal/log/development.log",
+    "spec/internal/log/test.log",
     "spec/models/application_record.rb",
     "spec/models/author.rb",
     "spec/models/author_history.rb",
     "spec/models/byline.rb",
+    "spec/models/code_file.rb",
     "spec/models/comment.rb",
     "spec/models/comment_history.rb",
     "spec/models/easy_ml/column.rb",
@@ -113,6 +117,10 @@ Gem::Specification.new do |s|
     "spec/models/safe_post_history.rb",
     "spec/models/silent_post.rb",
     "spec/models/silent_post_history.rb",
+    "spec/models/template.rb",
+    "spec/models/template_file.rb",
+    "spec/models/template_file_history.rb",
+    "spec/models/template_history.rb",
     "spec/models/test_article.rb",
     "spec/models/test_article_history.rb",
     "spec/models/test_category.rb",
@@ -125,8 +133,13 @@ Gem::Specification.new do |s|
     "spec/models/thing_with_compound_index_history.rb",
     "spec/models/thing_without_history.rb",
     "spec/models/user.rb",
+    "spec/models/website.rb",
+    "spec/models/website_file.rb",
+    "spec/models/website_file_history.rb",
+    "spec/models/website_history.rb",
     "spec/rails_integration/historiographer_rails_integration_spec.rb",
-    "spec/spec_helper.rb"
+    "spec/spec_helper.rb",
+    "spec/view_backed_model_spec.rb"
   ]
   s.homepage = "http://github.com/brettshollenberger/historiographer".freeze
   s.licenses = ["MIT".freeze]

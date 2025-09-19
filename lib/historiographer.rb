@@ -304,6 +304,11 @@ module Historiographer
 
         # Recursively snapshot associations, avoiding infinite loops
         self.class.reflect_on_all_associations.each do |association|
+          # Skip associations to models without primary keys (e.g., database views)
+          association_class = association.klass rescue nil
+          next if association_class.nil?
+          next if association_class.primary_key.nil?
+          
           associated_records = send(association.name)&.reload
           if associated_records.respond_to?(:order)
             associated_records = associated_records.order(id: :asc)

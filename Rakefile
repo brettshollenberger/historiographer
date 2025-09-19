@@ -22,6 +22,20 @@ Jeweler::Tasks.new do |gem|
   gem.description = %Q{Creates separate tables for each history table}
   gem.email = "brett.shollenberger@gmail.com"
   gem.authors = ["brettshollenberger"]
+  
+  # Use glob patterns to automatically include all relevant files
+  gem.files = `git ls-files`.split("\n").reject { |f| 
+    f.match(/^(test|spec|features)\//) || 
+    f.match(/\.gem$/) ||
+    f.match(/^\./) ||
+    f == 'Gemfile.lock'
+  }
+  
+  # Include spec files for development/testing
+  gem.files += Dir.glob("spec/**/*")
+  
+  # Ensure we have all the executables
+  gem.executables = Dir.glob("bin/*").map { |f| File.basename(f) }
 end
 Jeweler::RubygemsDotOrgTasks.new
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2025_08_26_000003) do
+ActiveRecord::Schema[7.1].define(version: 2025_08_27_000008) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -299,6 +299,66 @@ ActiveRecord::Schema[7.1].define(version: 2025_08_26_000003) do
     t.index ["live_at"], name: "index_silent_posts_on_live_at"
   end
 
+  create_table "template_file_histories", force: :cascade do |t|
+    t.integer "template_file_id", null: false
+    t.integer "template_id", null: false
+    t.string "path", null: false
+    t.text "content"
+    t.tsvector "content_tsv"
+    t.string "shasum"
+    t.integer "file_specification_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_template_file_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_template_file_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_template_file_histories_on_history_user_id"
+    t.index ["snapshot_id"], name: "index_template_file_histories_on_snapshot_id"
+    t.index ["template_file_id"], name: "index_template_file_histories_on_template_file_id"
+    t.index ["template_id", "path"], name: "index_template_file_histories_on_template_id_and_path"
+    t.index ["template_id"], name: "index_template_file_histories_on_template_id"
+  end
+
+  create_table "template_files", force: :cascade do |t|
+    t.bigint "template_id", null: false
+    t.string "path", null: false
+    t.text "content"
+    t.tsvector "content_tsv"
+    t.string "shasum"
+    t.integer "file_specification_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["template_id", "path"], name: "index_template_files_on_template_id_and_path", unique: true
+    t.index ["template_id"], name: "index_template_files_on_template_id"
+  end
+
+  create_table "template_histories", force: :cascade do |t|
+    t.integer "template_id", null: false
+    t.string "name", null: false
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_template_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_template_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_template_histories_on_history_user_id"
+    t.index ["snapshot_id"], name: "index_template_histories_on_snapshot_id"
+    t.index ["template_id"], name: "index_template_histories_on_template_id"
+  end
+
+  create_table "templates", force: :cascade do |t|
+    t.string "name", null: false
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
   create_table "test_article_histories", force: :cascade do |t|
     t.integer "test_article_id", null: false
     t.string "title"
@@ -419,4 +479,69 @@ ActiveRecord::Schema[7.1].define(version: 2025_08_26_000003) do
     t.string "name"
   end
 
+  create_table "website_file_histories", force: :cascade do |t|
+    t.integer "website_file_id", null: false
+    t.integer "website_id", null: false
+    t.string "path", null: false
+    t.text "content"
+    t.tsvector "content_tsv"
+    t.string "shasum"
+    t.integer "file_specification_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_website_file_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_website_file_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_website_file_histories_on_history_user_id"
+    t.index ["snapshot_id"], name: "index_website_file_histories_on_snapshot_id"
+    t.index ["website_file_id"], name: "index_website_file_histories_on_website_file_id"
+    t.index ["website_id", "path"], name: "index_website_file_histories_on_website_id_and_path"
+    t.index ["website_id"], name: "index_website_file_histories_on_website_id"
+  end
+
+  create_table "website_files", force: :cascade do |t|
+    t.bigint "website_id", null: false
+    t.string "path", null: false
+    t.text "content"
+    t.tsvector "content_tsv"
+    t.string "shasum"
+    t.integer "file_specification_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["website_id", "path"], name: "index_website_files_on_website_id_and_path", unique: true
+    t.index ["website_id"], name: "index_website_files_on_website_id"
+  end
+
+  create_table "website_histories", force: :cascade do |t|
+    t.integer "website_id", null: false
+    t.string "domain", null: false
+    t.integer "template_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.datetime "history_started_at", null: false
+    t.datetime "history_ended_at"
+    t.integer "history_user_id"
+    t.string "snapshot_id"
+    t.index ["history_ended_at"], name: "index_website_histories_on_history_ended_at"
+    t.index ["history_started_at"], name: "index_website_histories_on_history_started_at"
+    t.index ["history_user_id"], name: "index_website_histories_on_history_user_id"
+    t.index ["snapshot_id"], name: "index_website_histories_on_snapshot_id"
+    t.index ["template_id"], name: "index_website_histories_on_template_id"
+    t.index ["website_id"], name: "index_website_histories_on_website_id"
+  end
+
+  create_table "websites", force: :cascade do |t|
+    t.string "domain", null: false
+    t.bigint "template_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["template_id"], name: "index_websites_on_template_id"
+  end
+
+  add_foreign_key "template_files", "templates"
+  add_foreign_key "website_files", "websites"
+  add_foreign_key "websites", "templates"
 end
