@@ -382,35 +382,45 @@ module Historiographer
       current_history = histories.where(history_ended_at: nil).order('id desc').limit(1).last
 
       if history_class.history_foreign_key.present? && history_class.present?
-        result = history_class.insert_all([attrs])
-        
-        # Check if the insertion was successful
-        if result.rows.empty?
-          # insert_all returned empty rows, likely due to a duplicate/conflict
-          # Try to find the existing record that prevented insertion
-          foreign_key = history_class.history_foreign_key
-          existing_history = history_class.where(
-            foreign_key => attrs[foreign_key],
-            history_started_at: attrs['history_started_at']
-          ).first
-          
-          if existing_history
-            # A duplicate history already exists (race condition or retry)
-            # This is acceptable - return the existing history
-            Rails.logger.warn("Duplicate history detected for #{self.class.name} ##{id} at #{attrs['history_started_at']}. Using existing history record ##{existing_history.id}.") if Rails.logger
-            current_history.update_columns(history_ended_at: now) if current_history.present?
-            return existing_history
-          else
-            history_class.create!(attrs) # This will raise the correct error since it will fail the unique constraint
+        if defined?(ActiveRecord::ConnectionAdapters::OracleEnhanced)
+          # Oracle Enhanced gem does not support insert_all
+          instance = history_class.new(attrs)
+          unless instance.save
+            return check_duplicate_history(attrs)
           end
+        else
+          result = history_class.insert_all([attrs])
+          # Check if the insertion was successful
+          if result.rows.empty?
+            # insert_all returned empty rows, likely due to a duplicate/conflict
+            return check_duplicate_history(attrs)
+          end
+          inserted_id = result.rows.first.first if history_class.primary_key == 'id'
+          instance = history_class.find(inserted_id)
         end
-        
-        inserted_id = result.rows.first.first if history_class.primary_key == 'id'
-        instance = history_class.find(inserted_id)
         current_history.update_columns(history_ended_at: now) if current_history.present?
         instance
       else
         raise 'Need foreign key and history class to save history!'
+      end
+    end
+
+    def check_duplicate_history(attrs)
+      # Try to find the existing record that prevented insertion
+      foreign_key = history_class.history_foreign_key
+      existing_history = history_class.where(
+        foreign_key => attrs[foreign_key],
+        history_started_at: attrs['history_started_at']
+      ).first
+
+      if existing_history
+        # A duplicate history already exists (race condition or retry)
+        # This is acceptable - return the existing history
+        Rails.logger.warn("Duplicate history detected for #{self.class.name} ##{id} at #{attrs['history_started_at']}. Using existing history record ##{existing_history.id}.") if Rails.logger
+        current_history.update_columns(history_ended_at: now) if current_history.present?
+        existing_history
+      else
+        history_class.create!(attrs) # This will raise the correct error since it will fail the unique constraint
       end
     end
 
