@@ -1,6 +1,6 @@
 require_relative "history_migration_mysql"
 
-if defined?(ActiveRecord::ConnectionAdapters::Mysql2Adapter)
+if defined?(ActiveRecord::ConnectionAdapters::Mysql2Adapter) || defined?(ActiveRecord::ConnectionAdapters::OracleEnhanced)
   class ActiveRecord::ConnectionAdapters::TableDefinition
     include Historiographer::HistoryMigrationMysql
   end

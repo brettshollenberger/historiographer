@@ -251,7 +251,7 @@ end
 You should create a model named _posts_histories_:
 
 ```ruby
-require "historiographer/postgres_migration"
+require "historiographer/postgres_migration" # or require "historiographer/mysql_migration" for MySql or Oracle databases 
 class CreatePostHistories < ActiveRecord::Migration
   def change
     create_table :post_histories do |t|
