@@ -12,7 +12,7 @@ The Audited gem has some serious flaws.
 
 2. It doesn't provide the indexes you need from your primary tables
 
-3. It doesn't provdie out-of-the-box snapshots
+3. It doesn't provide out-of-the-box snapshots
 
 ## How does Historiographer solve these problems?
 
@@ -86,14 +86,17 @@ You can take a snapshot of a record and all its associated records:
 
 ```ruby
 post = Post.find(1)
-post.snapshot(history_user_id: current_user.id)
+post.snapshot
 ```
 
 This will:
 
 1. Create a history record for the post
-2. Create history records for all associated records (comments, author, etc.)
+2. Recursively create history records for all associated records that also include Historiographer (comments, author, etc.)
 3. Link these history records together with a shared `snapshot_id`
+4. Skip any view-backed models (models without a primary key)
+
+**Note:** The snapshot cascades to ALL associations where the associated model includes Historiographer. There is currently no built-in way to limit which associations get snapshotted. If you need finer control, you can either not include Historiographer on models you don't want snapshotted, or override the `snapshot` method.
 
 You can retrieve the latest snapshot using:
 
@@ -129,6 +132,38 @@ This can be useful when:
 - You need to capture the state of complex object graphs at specific moments
 - You're versioning training data for machine learning models
 - You need to maintain immutable audit trails at specific checkpoints
+
+## Safe and Silent Modes
+
+Historiographer provides two additional modes for migrating existing models:
+
+### Historiographer::Safe
+
+Use `Historiographer::Safe` when migrating an existing model to Historiographer. Instead of raising an error when `history_user_id` is missing, it logs to Rollbar, allowing you to find all locations that need to be updated:
+
+```ruby
+class Post < ActiveRecord::Base
+  include Historiographer::Safe
+end
+
+# This will create a history record and log to Rollbar (instead of raising an error)
+Post.create(title: "My Post")
+```
+
+### Historiographer::Silent
+
+Use `Historiographer::Silent` when you want to allow missing `history_user_id` without any errors or logging:
+
+```ruby
+class Post < ActiveRecord::Base
+  include Historiographer::Silent
+end
+
+# This will create a history record silently without history_user_id
+Post.create(title: "My Post")
+```
+
+**Note:** Both Safe and Silent modes are intended for migration purposes, not as long-term solutions.
 
 ## Namespaced Models
 
@@ -296,6 +331,7 @@ You should also make a `PostHistory` class if you're going to query `PostHistory
 ```ruby
 class PostHistory < ActiveRecord::Base
   self.table_name = "post_histories"
+  include Historiographer::History
 end
 ```
 
@@ -321,6 +357,21 @@ Post.find_by(title: "My Great Title").update(title: "A New Title", history_user_
 Post.update_all(title: "They're all the same!", history_user_id: current_user.id)
 Post.last.destroy!(history_user_id: current_user.id)
 Post.destroy_all(history_user_id: current_user.id)
+```
+
+### Skipping History
+
+If you need to save a record without creating a history entry:
+
+```ruby
+post = Post.new(title: "My Post")
+post.save_without_history    # No history_user_id required
+post.save_without_history!   # Bang version
+
+# For bulk operations:
+Post.all.update_all_without_history(title: "New Title")
+Post.all.delete_all_without_history
+Post.all.destroy_all_without_history
 ```
 
 The `histories` classes have a `current` method, which only finds current history records. These records will also be the same as the data in the primary table.
