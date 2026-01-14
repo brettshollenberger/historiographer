@@ -188,7 +188,7 @@ module Historiographer
     rescue NameError
       # Get the base table name without _histories suffix
       base_table = base.table_name.singularize.sub(/_histories$/, '')
-      
+
       history_class_initializer = Class.new(ActiveRecord::Base) do
         self.table_name = "#{base_table}_histories"
       end
@@ -204,7 +204,7 @@ module Historiographer
 
       # Set the constant in the correct module
       history_class = target_module.const_set(final_class_name, history_class_initializer)
-      
+
       # Now that the class is named, include the History module and extend class methods
       history_class.send(:include, Historiographer::History)
     end
@@ -279,7 +279,7 @@ module Historiographer
       save!(*args, &block)
       @no_history = false
     end
-    
+
     def snapshot(tree = {}, snapshot_id = nil)
       return if is_history_class?
 
@@ -296,7 +296,7 @@ module Historiographer
         null_snapshot = history_class.where(foreign_key => attrs[primary_key], snapshot_id: nil).first
         snapshot = nil
         if null_snapshot.present?
-          null_snapshot.update(snapshot_id: snapshot_id)
+          null_snapshot.update!(snapshot_id: snapshot_id)
           snapshot = null_snapshot
         else
           snapshot = record_history(snapshot_id: snapshot_id)
@@ -308,7 +308,7 @@ module Historiographer
           association_class = association.klass rescue nil
           next if association_class.nil?
           next if association_class.primary_key.nil?
-          
+
           associated_records = send(association.name)&.reload
           if associated_records.respond_to?(:order)
             associated_records = associated_records.order(id: :asc)
@@ -383,7 +383,7 @@ module Historiographer
 
       if history_class.history_foreign_key.present? && history_class.present?
         result = history_class.insert_all([attrs])
-        
+
         # Check if the insertion was successful
         if result.rows.empty?
           # insert_all returned empty rows, likely due to a duplicate/conflict
@@ -393,7 +393,7 @@ module Historiographer
             foreign_key => attrs[foreign_key],
             history_started_at: attrs['history_started_at']
           ).first
-          
+
           if existing_history
             # A duplicate history already exists (race condition or retry)
             # This is acceptable - return the existing history
@@ -404,7 +404,7 @@ module Historiographer
             history_class.create!(attrs) # This will raise the correct error since it will fail the unique constraint
           end
         end
-        
+
         inserted_id = result.rows.first.first if history_class.primary_key == 'id'
         instance = history_class.find(inserted_id)
         current_history.update_columns(history_ended_at: now) if current_history.present?

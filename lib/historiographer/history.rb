@@ -109,8 +109,11 @@ module Historiographer
       #
       # Set up user association unless Silent module is included
       # Defer this check until foreign_class is available
+      # Use optional: true because history_user_id validation is handled separately
+      # by Historiographer's validate_history_user_id_present method, and we need
+      # to allow updates without a user when using without_history_user_id blocks
       unless base.foreign_class && base.foreign_class.ancestors.include?(Historiographer::Silent)
-        belongs_to :user, foreign_key: :history_user_id
+        belongs_to :user, foreign_key: :history_user_id, optional: true
       end
 
       # Add method_added hook to the original class when it's available

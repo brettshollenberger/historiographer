@@ -823,6 +823,36 @@ describe Historiographer do
       expect(post.latest_snapshot.comment_count).to eq 1
     end
 
+    it "snapshots all children when one has a null_snapshot history record" do
+      # This tests a bug where if one child record already has a history with snapshot_id: nil,
+      # the snapshot would silently fail to update it due to belongs_to :user validation
+      Historiographer::Configuration.mode = :snapshot_only
+
+      # Create records without triggering histories (snapshot_only mode)
+      author1 = Author.create(full_name: 'Author One', history_user_id: user.id)
+      author2 = Author.create(full_name: 'Author Two', history_user_id: user.id)
+
+      # Manually create a null_snapshot history for author1 (simulating previous state)
+      # This mimics what happens when a record has a history created outside of snapshot
+      AuthorHistory.create!(
+        author_id: author1.id,
+        full_name: author1.full_name,
+        history_user_id: nil,  # No user - this will trigger the bug
+        snapshot_id: nil,      # Null snapshot
+        history_started_at: Time.current
+      )
+
+      expect(AuthorHistory.count).to eq 1
+      expect(AuthorHistory.where(snapshot_id: nil).count).to eq 1
+
+      # Now snapshot author1 - this should work even though there's a null_snapshot
+      # The bug: without_history_user_id doesn't prevent belongs_to :user validation
+      author1.snapshot
+
+      expect(AuthorHistory.where.not(snapshot_id: nil).count).to eq 1
+      expect(AuthorHistory.first.snapshot_id).to be_present
+    end
+
     it "doesn't explode" do
       project = Project.create(name: "test_project")
       project_file = ProjectFile.create(project: project, name: "test_file", content: "Hello world")
