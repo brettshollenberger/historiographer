@@ -341,6 +341,15 @@ module Historiographer
       foreign_key = history_class.history_foreign_key
 
       attrs = attrs.stringify_keys
+
+      self.class.defined_enums.each_key do |enum_name|
+        if attrs[enum_name].present?
+          key = attrs[enum_name]
+          value = self.class.send(enum_name.pluralize)[key]
+          attrs[enum_name] = value if value.present?
+        end
+      end
+
       allowed_columns = self.class.columns.map(&:name)
       attrs.select! { |k,v| allowed_columns.include?(k) }.to_h
 
