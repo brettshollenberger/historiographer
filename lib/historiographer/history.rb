@@ -214,7 +214,7 @@ module Historiographer
       if base.respond_to?(association_name)
         raise "#{base} already has ##{association_name} association. Talk to Brett if this is a legit use case."
       else
-        belongs_to association_name, class_name: foreign_class_name
+        belongs_to association_name, class_name: foreign_class_name, foreign_key: history_foreign_key
       end
 
       # Ensure we can't destroy history records
