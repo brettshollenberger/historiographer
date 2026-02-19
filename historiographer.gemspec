@@ -6,7 +6,7 @@
 
 Gem::Specification.new do |s|
   s.name = "historiographer".freeze
-  s.version = "4.4.5"
+  s.version = "4.5.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0".freeze) if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib".freeze]
@@ -155,7 +155,6 @@ Gem::Specification.new do |s|
     s.add_runtime_dependency(%q<activerecord-import>.freeze, [">= 0"])
     s.add_runtime_dependency(%q<activesupport>.freeze, [">= 0"])
     s.add_runtime_dependency(%q<rails>.freeze, [">= 6"])
-    s.add_runtime_dependency(%q<rollbar>.freeze, [">= 0"])
     s.add_development_dependency(%q<mysql2>.freeze, ["= 0.5"])
     s.add_development_dependency(%q<paranoia>.freeze, [">= 0"])
     s.add_development_dependency(%q<pg>.freeze, [">= 0"])
@@ -170,7 +169,6 @@ Gem::Specification.new do |s|
     s.add_dependency(%q<activerecord-import>.freeze, [">= 0"])
     s.add_dependency(%q<activesupport>.freeze, [">= 0"])
     s.add_dependency(%q<rails>.freeze, [">= 6"])
-    s.add_dependency(%q<rollbar>.freeze, [">= 0"])
     s.add_dependency(%q<mysql2>.freeze, ["= 0.5"])
     s.add_dependency(%q<paranoia>.freeze, [">= 0"])
     s.add_dependency(%q<pg>.freeze, [">= 0"])

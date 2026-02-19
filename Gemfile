@@ -7,9 +7,8 @@ gem 'activerecord', '>= 6'
 gem 'activerecord-import'
 gem 'activesupport'
 gem 'rails', '>= 6'
-gem 'rollbar'
-
 group :development, :test do
+  gem 'rollbar'
   gem 'mysql2', '0.5'
   gem 'paranoia'
   gem 'pg'

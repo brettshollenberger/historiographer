@@ -7,6 +7,15 @@ module Historiographer
     OPTS = {
       mode: {
         default: :histories
+      },
+      error_notifier: {
+        default: ->(message) {
+          if defined?(Rollbar)
+            Rollbar.error(message)
+          elsif defined?(Rails) && Rails.logger
+            Rails.logger.error(message)
+          end
+        }
       }
     }
     OPTS.each do |key, options|

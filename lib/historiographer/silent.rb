@@ -6,7 +6,7 @@
 # Historiographer will throw an error if a model is saved without a user present,
 # unless you explicitly call save_without_history.
 #
-# Historiographer::Silent will not throw an error, and will not produce a Rollbar
+# Historiographer::Silent will not throw an error, and will not notify the error notifier
 #
 module Historiographer
   module Silent

@@ -267,14 +267,24 @@ describe Historiographer do
     end
 
     context 'When Safe mode' do
-      it 'creates history without history_user_id' do
-        expect(Rollbar).to receive(:error).with('history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history')
+      let(:error_messages) { [] }
 
+      before do
+        Historiographer::Configuration.error_notifier = ->(msg) { error_messages << msg }
+      end
+
+      after do
+        Historiographer::Configuration.instance.error_notifier = nil
+      end
+
+      it 'creates history without history_user_id' do
         post = SafePost.create(
           title: 'Post 1',
           body: 'Great post',
           author_id: 1
         )
+        expect(error_messages.length).to eq(1)
+        expect(error_messages.first).to include('history_user_id must be passed')
         expect_rails_errors(post.errors, {})
         expect(post).to be_persisted
         expect(post.histories.count).to eq 1
@@ -282,14 +292,13 @@ describe Historiographer do
       end
 
       it 'creates history with history_user_id' do
-        expect(Rollbar).to_not receive(:error)
-
         post = SafePost.create(
           title: 'Post 1',
           body: 'Great post',
           author_id: 1,
           history_user_id: user.id
         )
+        expect(error_messages).to be_empty
         expect_rails_errors(post.errors, {})
         expect(post).to be_persisted
         expect(post.histories.count).to eq 1
@@ -310,15 +319,24 @@ describe Historiographer do
     end
 
     context 'When Silent mode' do
-      it 'creates history without history_user_id' do
-        expect(Rollbar).to_not receive(:error)
+      let(:error_messages) { [] }
 
+      before do
+        Historiographer::Configuration.error_notifier = ->(msg) { error_messages << msg }
+      end
+
+      after do
+        Historiographer::Configuration.instance.error_notifier = nil
+      end
+
+      it 'creates history without history_user_id' do
         post = SilentPost.create(
           title: 'Post 1',
           body: 'Great post',
           author_id: 1
         )
 
+        expect(error_messages).to be_empty
         expect_rails_errors(post.errors, {})
         expect(post).to be_persisted
         expect(post.histories.count).to eq 1
@@ -330,14 +348,13 @@ describe Historiographer do
       end
 
       it 'creates history with history_user_id' do
-        expect(Rollbar).to_not receive(:error)
-
         post = SilentPost.create(
           title: 'Post 1',
           body: 'Great post',
           author_id: 1,
           history_user_id: user.id
         )
+        expect(error_messages).to be_empty
         expect_rails_errors(post.errors, {})
         expect(post).to be_persisted
         expect(post.histories.count).to eq 1
@@ -354,6 +371,46 @@ describe Historiographer do
         post.save_without_history
         expect(post).to be_persisted
         expect(post.histories.count).to eq 0
+      end
+    end
+
+    context 'Default error_notifier' do
+      it 'calls Rollbar.error when Rollbar is defined' do
+        expect(Rollbar).to receive(:error).with('history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history')
+
+        SafePost.create(title: 'Post 1', body: 'Great post', author_id: 1)
+      end
+
+      it 'falls back to Rails.logger.error when Rollbar is not defined' do
+        notifier = ->(message) {
+          if defined?(Rollbar)
+            Rollbar.error(message)
+          elsif defined?(Rails) && Rails.logger
+            Rails.logger.error(message)
+          end
+        }
+
+        hide_const('Rollbar')
+        logger = double('logger')
+        allow(Rails).to receive(:logger).and_return(logger)
+        expect(logger).to receive(:error).with('test message')
+
+        notifier.call('test message')
+      end
+
+      it 'does not raise when neither Rollbar nor Rails.logger is defined' do
+        notifier = ->(message) {
+          if defined?(Rollbar)
+            Rollbar.error(message)
+          elsif defined?(Rails) && Rails.logger
+            Rails.logger.error(message)
+          end
+        }
+
+        hide_const('Rollbar')
+        hide_const('Rails')
+
+        expect { notifier.call('test message') }.to_not raise_error
       end
     end
     it 'can override without history_user_id' do

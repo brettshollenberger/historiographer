@@ -4,7 +4,8 @@
 # Historiographer will throw an error if a model is saved without a user present,
 # unless you explicitly call save_without_history.
 #
-# Historiographer::Safe will not throw an error, but will rather produce a Rollbar,
+# Historiographer::Safe will not throw an error, but will rather notify via
+# the configured error notifier (see Historiographer::Configuration.error_notifier),
 # which enables a programmer to find all locations that need to be migrated,
 # rather than allowing an unsafe migration to take place.
 #
@@ -25,7 +26,7 @@ module Historiographer
       private
 
       def history_user_absent_action
-        Rollbar.error("history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history")
+        Historiographer::Configuration.error_notifier.call("history_user_id must be passed in order to save record with histories! If you are in a context with no history_user_id, explicitly call #save_without_history")
       end
     end
   end
